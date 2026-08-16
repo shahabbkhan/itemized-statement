@@ -1,0 +1,3188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Statements (Customer / Supplier)</title>
+<style>
+:root{
+  --ink:#1a1a1a;
+  --line:#000;
+  --line-strong:#000;
+  --paper:#ffffff;
+  --shell:#ffffff;
+  --accent:#2f4a63;
+  --accent-soft:#eaf0f5;
+  --muted:#000;
+  --danger:#a3312a;
+  --ok:#2e7d4f;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Segoe UI',Arial,Helvetica,sans-serif;
+  background:#f0f2f5;
+  color:var(--ink);
+  padding:20px;
+  display:flex;
+  justify-content:center;
+}
+.statement-card{
+  max-width:1180px;
+  width:100%;
+  background:var(--paper);
+  border:none;
+  border-radius:8px;
+  box-shadow:0 1px 4px rgba(0,0,0,.10),0 4px 16px rgba(0,0,0,.06);
+}
+
+/* ---- Toolbar ---- */
+.controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 8px;
+  align-items:center;
+  padding:10px 16px;
+  background:#fff;
+  border-bottom:1px solid #e2e6ea;
+  border-radius:8px 8px 0 0;
+}
+.controls-group{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding-right:10px;
+  border-right:1px solid #e2e6ea;
+  margin-right:2px;
+}
+.controls-group:last-child{border-right:none;padding-right:0;margin-left:auto;}
+.controls label{font-size:.72rem;font-weight:600;color:#6c757d;white-space:nowrap;}
+.controls select,.controls input[type="date"]{
+  padding:5px 8px;
+  border:1px solid #ced4da;
+  border-radius:5px;
+  background:#fff;
+  font-size:.81rem;
+  font-family:inherit;
+  color:var(--ink);
+  outline:none;
+  transition:border-color .15s;
+}
+.controls select:focus,.controls input[type="date"]:focus{border-color:var(--accent);}
+.controls select#rangePreset{min-width:165px;font-weight:600;}
+.controls select#partySelect{min-width:190px;}
+.controls select#modeSelect{min-width:110px;}
+.controls button{
+  border:none;
+  padding:6px 13px;
+  border-radius:5px;
+  font-weight:600;
+  font-size:.78rem;
+  cursor:pointer;
+  color:#fff;
+  background:var(--accent);
+  white-space:nowrap;
+  transition:filter .15s,opacity .15s;
+}
+.controls button:hover{filter:brightness(1.08);}
+.controls button:disabled{opacity:.45;cursor:not-allowed;}
+.controls button.btn-secondary{
+  background:#fff;
+  color:#444;
+  border:1px solid #ced4da;
+}
+.controls button.btn-secondary:hover{background:#f8f9fa;filter:none;}
+.controls button.btn-link{background:transparent;color:var(--accent);padding:5px 4px;font-size:.8rem;}
+.controls button.btn-link:hover{text-decoration:underline;filter:none;}
+.controls input[type="checkbox"]{width:15px;height:15px;margin:0 4px 0 0;vertical-align:middle;accent-color:var(--accent);}
+
+/* ---- Dashboard ---- */
+.dashboard-body{padding:20px 24px 28px;}
+.dash-section-title{
+  font-size:.68rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:#9aa0a6;
+  margin-bottom:10px;
+}
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;
+  margin-bottom:24px;
+}
+.card{
+  border:1px solid #e9ecef;
+  border-radius:8px;
+  padding:14px 16px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+  transition:box-shadow .15s;
+}
+.card:hover{box-shadow:0 2px 8px rgba(0,0,0,.09);}
+.card .card-label{
+  font-size:.65rem;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  color:#9aa0a6;
+  margin-bottom:5px;
+  font-weight:700;
+}
+.card .card-value{font-size:1.1rem;font-weight:700;line-height:1.3;color:var(--ink);}
+.card .card-sub{font-size:.7rem;color:#9aa0a6;margin-top:3px;}
+.card.card-danger .card-value{color:var(--danger);}
+.card.card-ok .card-value{color:var(--ok);}
+
+.dash-table-wrap{overflow-x:auto;border-radius:6px;border:1px solid #e9ecef;}
+table.dash-table{width:100%;border-collapse:collapse;font-size:.84rem;}
+table.dash-table thead th{
+  text-align:left;
+  padding:8px 12px;
+  font-size:.67rem;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#6c757d;
+  background:#f8f9fa;
+  border-bottom:1px solid #e9ecef;
+  white-space:nowrap;
+  cursor:pointer;
+  user-select:none;
+}
+table.dash-table thead th.num{text-align:right;}
+table.dash-table thead th .sort-arrow{opacity:.5;font-size:.62rem;margin-left:3px;}
+table.dash-table thead th:first-child{width:30px;text-align:center;}
+table.dash-table tbody tr{
+  cursor:pointer;
+  border-bottom:1px solid #f1f3f5;
+  transition:background .1s;
+}
+table.dash-table tbody tr:last-child{border-bottom:none;}
+table.dash-table tbody tr:hover{background:#f8f9ff;}
+table.dash-table td{padding:8px 12px;vertical-align:middle;}
+table.dash-table td:first-child{text-align:center;width:30px;}
+table.dash-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+table.dash-table td.bal-dr{color:var(--danger);font-weight:600;}
+table.dash-table td.bal-cr{color:var(--ok);font-weight:600;}
+table.dash-table td.bal-zero{color:#adb5bd;}
+.code-chip{
+  display:inline-block;
+  font-size:.65rem;
+  font-weight:700;
+  color:#6c757d;
+  background:#f1f3f5;
+  border-radius:4px;
+  padding:1px 6px;
+  margin-right:6px;
+  letter-spacing:.03em;
+}
+
+/* ---- Batch statement pages ---- */
+.statement-page {
+  page-break-before: always;
+}
+.statement-page:first-of-type {
+  page-break-before: avoid;
+}
+
+/* ---- Statement head (first page only) ---- */
+.statement-body{padding:22px 26px 18px;}
+.doc-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  border-bottom:3px double var(--ink);
+  padding-bottom:10px;
+  margin-bottom:14px;
+}
+.biz-block{text-align:right;}
+.biz-name{
+  font-size:1.05rem;
+  font-weight:700;
+  letter-spacing:.01em;
+  line-height:1.2;
+}
+.biz-address{
+  font-size:.72rem;
+  color:var(--muted);
+  white-space:pre-line;
+  margin-top:3px;
+}
+.doc-meta{text-align:left;font-size:.78rem;color:var(--muted);}
+.doc-meta-title{
+  font-size:1.15rem;
+  font-weight:700;
+  letter-spacing:.02em;
+  color:var(--ink);
+  margin-bottom:2px;
+}
+.doc-meta-sub{font-size:.72rem;color:var(--muted);}
+.doc-meta-generated{font-size:.72rem;color:var(--muted);margin-top:2px;}
+.doc-meta-generated strong{color:var(--ink);}
+
+.party-block{
+  display:flex;
+  justify-content:space-between;
+  gap:20px;
+  margin-bottom:16px;
+  font-size:.85rem;
+}
+.party-block .label{
+  font-size:.65rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--muted);
+  margin-bottom:2px;
+}
+.party-block .name{font-weight:700;font-size:1rem;}
+.party-block .address{
+  font-size:.75rem;
+  color:var(--muted);
+  white-space:pre-line;
+  margin-top:2px;
+}
+.party-block .range{text-align:right;}
+
+/* ---- Data warnings ---- */
+.warning-banner{
+  background:#fef3c7;
+  border:1px solid #000;
+  border-radius:4px;
+  padding:6px 12px;
+  margin-bottom:14px;
+  font-size:.78rem;
+  color:#000;
+}
+.warning-banner strong{font-weight:700;}
+
+/* ---- Compact table ---- */
+.table-wrap{overflow-x:auto;}
+.table-wrap table{
+  table-layout: auto;
+  width: 100%;
+  border-collapse:collapse;
+  font-size:.8rem;
+}
+/* Vertical lines - black */
+.table-wrap table th,
+.table-wrap table td{
+  border-right: 1px solid #000;
+  padding: 4px 6px;
+}
+.table-wrap table th:last-child,
+.table-wrap table td:last-child{
+  border-right: none;
+}
+/* Numeric columns – compact, no wrap */
+.table-wrap table th.num,
+.table-wrap table td.num{
+  white-space: nowrap;
+  min-width: 70px;
+  width: auto;
+  text-align:right;
+}
+/* Date column – narrower */
+.table-wrap table th:first-child,
+.table-wrap table td:first-child{
+  min-width: 70px;
+}
+/* ---------- */
+thead th{
+  text-align:left;
+  padding:4px 6px;
+  font-size:.68rem;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#000;
+  background:transparent;
+  border-bottom:2px solid #000;
+  white-space:nowrap;
+}
+th.num,td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+td{padding:2px 6px;vertical-align:top;line-height:1.3;word-break:break-word;overflow-wrap:anywhere;}
+td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
+
+.tr-main td{
+  border-top:1px solid var(--ink);
+  padding-top:4px;
+}
+.tr-detail td{
+  padding-left:22px;
+  font-weight:400;
+  font-size:.75rem;
+  border-bottom:none;
+}
+.tr-detail .desc{
+  padding-left:6px;
+  border-bottom:0.5px dotted #aaa;
+  padding-bottom:1px;
+}
+.tr-detail:last-child .desc{border-bottom:none;}
+.tr-balance-forward td{
+  font-weight:700;
+  background:var(--accent-soft);
+  border-top:1px solid var(--ink);
+  border-bottom:1px solid var(--ink);
+}
+.tr-total td{
+  font-weight:700;
+  border-top:2px solid var(--ink);
+  background:var(--accent-soft);
+}
+.tr-empty td{
+  text-align:center;
+  color:var(--muted);
+  font-style:italic;
+  padding:14px 6px;
+}
+
+.badge{
+  display:inline-block;
+  font-size:.6rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+  padding:1px 6px;
+  border:1px solid var(--ink);
+  border-radius:2px;
+  margin-right:6px;
+}
+
+/* ---- Print-only header row inside thead ---- */
+.print-header-row{
+  display:none;
+}
+
+/* ---- Summary & Closing ---- */
+.summary-line{
+  margin-top:10px;
+  padding:6px 0;
+  font-size:.82rem;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:4px 16px;
+  border-top:1px solid var(--line);
+}
+.summary-line .item{white-space:nowrap;}
+.summary-line .item strong{font-weight:700;}
+.closing-line{
+  margin-top:4px;
+  padding-top:6px;
+  font-size:.95rem;
+  font-weight:700;
+  border-top:2px solid var(--ink);
+  text-align:right;
+}
+
+.error{
+  color:#842029;
+  background:#f8d7da;
+  border:1px solid #f5c2c7;
+  padding:9px 14px;
+  border-radius:6px;
+  margin:10px 16px;
+  display:none;
+  font-size:.82rem;
+}
+.loader{display:none;text-align:center;padding:24px;color:#9aa0a6;font-size:.84rem;letter-spacing:.02em;}
+.empty-state{padding:40px;text-align:center;color:#9aa0a6;font-size:.88rem;}
+
+/* ---- Print styles ---- */
+@media print{
+  body{background:#fff;padding:0;}
+  .no-print,.print-hint{display:none !important;}
+  .statement-card{
+    max-width:100%;
+    border:none;
+    border-radius:0;
+    background:#fff;
+  }
+  .statement-body{padding:0.15in 0.25in;}
+  thead{display:table-header-group;}
+  tr{page-break-inside:avoid;}
+  thead th{background:transparent !important;color:#000 !important;border-bottom:2px solid #000 !important;}
+  .tr-balance-forward td,.tr-total td{background:#eee !important;}
+  .badge{border-color:#000;}
+  .tr-detail .desc{border-bottom:0.5px dotted #aaa !important;}
+  .warning-banner{border-color:#000;background:#f8f4e6;color:#000;}
+  .summary-line{border-top:1px solid #000;}
+  .closing-line{border-top:2px solid #000;}
+  .table-wrap table th,
+  .table-wrap table td{
+    border-right: 1px solid #000 !important;
+  }
+  .table-wrap table th:last-child,
+  .table-wrap table td:last-child{
+    border-right: none !important;
+  }
+
+  .print-header-row{
+    display:table-row !important;
+  }
+  .print-header-row td{
+    padding:2px 4px !important;
+    font-size:0.45rem !important;
+    font-weight:400 !important;
+    text-align:right !important;
+    border-bottom:none !important;
+    background:white !important;
+    color:#000 !important;
+  }
+
+  @page{
+    margin:0.3in 0.3in 0.5in 0.3in;
+    @bottom-center{
+      content:"Page " counter(page) " of " counter(pages);
+      font-size:0.7rem;
+      color:#000;
+      font-family:'Segoe UI',Arial,sans-serif;
+    }
+  }
+}
+
+@media (max-width:640px){
+  .statement-body{padding:14px;}
+  .doc-title{flex-direction:column;align-items:flex-start;gap:8px;}
+  .biz-block{text-align:left;}
+  .party-block{flex-direction:column;gap:6px;}
+  .party-block .range{text-align:left;}
+  .summary-line{justify-content:flex-start;gap:4px 8px;font-size:.75rem;}
+}
+</style>
+</head>
+<body>
+<div class="statement-card" id="app">
+
+  <div class="controls no-print">
+    <div class="controls-group">
+      <button id="backToDashboard" class="btn-link" style="display:none;">&larr; All Parties</button>
+      <label>Mode</label>
+      <select id="modeSelect">
+        <option value="customer">Customer</option>
+        <option value="supplier">Supplier</option>
+      </select>
+      <label>Party</label>
+      <select id="partySelect"><option value="">— All —</option></select>
+    </div>
+    <div class="controls-group">
+      <label>Period</label>
+      <select id="rangePreset">
+        <option value="custom">Custom Range</option>
+        <optgroup label="Current Period">
+          <option value="this-month">This Month</option>
+          <option value="this-quarter">This Quarter</option>
+          <option value="this-year">This Year</option>
+        </optgroup>
+        <optgroup label="Last Complete Period">
+          <option value="last-month">Last Month</option>
+          <option value="last-quarter">Last Quarter</option>
+          <option value="last-year">Last Year</option>
+        </optgroup>
+        <optgroup label="Rolling">
+          <option value="last-3-months">Last 3 Months</option>
+          <option value="last-6-months">Last 6 Months</option>
+          <option value="last-12-months">Last 12 Months</option>
+        </optgroup>
+        <optgroup label="All Time">
+          <option value="from-start">From Start (Inception to Date)</option>
+        </optgroup>
+      </select>
+      <label>From</label><input type="date" id="fromDate" />
+      <label>To</label><input type="date" id="toDate" />
+      <button id="fetchBtn">Generate</button>
+      <button id="generateBatchBtn" class="btn-secondary" style="display:none;">Generate Selected</button>
+    </div>
+    <div class="controls-group">
+      <button id="printBtn" class="btn-secondary" style="display:none;">&#128438; Print</button>
+      <button id="printDashboardBtn" class="btn-secondary">&#128438; Print</button>
+      <button id="exportBtn" class="btn-secondary" style="display:none;">&#8659; CSV</button>
+      <button id="refreshBtn" class="btn-secondary" title="Refetch everything from Manager">&#8635; Refresh</button>
+    </div>
+    <div class="controls-group">
+      <label><input type="checkbox" id="batchModeToggle" /> Batch Mode</label>
+      <label><input type="checkbox" id="hideZeroToggle" /> Hide Zero Balances</label>
+    </div>
+  </div>
+
+  <div id="errorMsg" class="error"></div>
+  <div id="loader" class="loader">Loading data…</div>
+
+  <div id="dashboardView">
+    <div class="dashboard-body" id="dashboardContent">
+      <div class="empty-state">Loading parties…</div>
+    </div>
+  </div>
+
+  <div id="statementView" style="display:none;">
+    <div class="statement-body" id="statementContent"></div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// CONFIGURATION
+// ================================================================
+const MODES = {
+  customer: {
+    label: 'Customer',
+    partyBatch: '/api4/customer-batch',
+    mainControlAccount: '/api4/balance-sheet-accounts-receivable-account',
+    controlAccountsBatch: '/api4/control-account-for-customers-batch',
+    invoiceBatch: '/api4/sales-invoice-batch',
+    creditNoteBatch: '/api4/credit-note-batch',
+    linePartyField: 'accountsReceivableCustomer',
+    headerPartyField: 'customer',
+    controlAccountFlag: 'isAccountsReceivable',
+    invoiceLinePriceField: 'salesUnitPrice',
+    includeLateFees: true,
+    payeeValue: 1,
+    invoiceIsDebit: true,
+    paymentIsDebit: true,
+    creditNoteIsDebit: false,
+    outstandingLabel: 'Total Outstanding (Dr)',
+    creditLabel: 'Credit balances',
+  },
+  supplier: {
+    label: 'Supplier',
+    partyBatch: '/api4/supplier-batch',
+    mainControlAccount: '/api4/balance-sheet-accounts-payable-account',
+    controlAccountsBatch: '/api4/control-account-for-suppliers-batch',
+    invoiceBatch: '/api4/purchase-invoice-batch',
+    creditNoteBatch: '/api4/debit-note-batch',
+    linePartyField: 'accountsPayableSupplier',
+    headerPartyField: 'supplier',
+    controlAccountFlag: 'isAccountsPayable',
+    invoiceLinePriceField: 'purchaseUnitPrice',
+    includeLateFees: false,
+    payeeValue: 2,
+    invoiceIsDebit: false,
+    paymentIsDebit: true,
+    creditNoteIsDebit: true,
+    outstandingLabel: 'Total Payable (Cr)',
+    creditLabel: 'Debit balances',
+  }
+};
+
+// ================================================================
+// HELPER: Get payee type (payment uses "payee", receipt uses "paidBy")
+// ================================================================
+function getPayeeType(doc) {
+  return (doc.payee !== undefined && doc.payee !== null) ? doc.payee : doc.paidBy;
+}
+
+// ================================================================
+// 1. POSTMESSAGE & PAGINATION HELPERS
+// ================================================================
+async function postMessageWithResponse(message, timeoutMs = 30000) {
+  const attempt = () => new Promise((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('message', onMessage);
+      reject(new Error(`API timeout: ${message.path}`));
+    }, timeoutMs);
+    function onMessage(event) {
+      if (event.data?.type?.endsWith('-response') && event.data?.requestId === requestId) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        resolve(event.data.body);
+      }
+    }
+    window.addEventListener('message', onMessage);
+    window.parent.postMessage({ ...message, requestId }, '*');
+  });
+  try {
+    return await attempt();
+  } catch (err) {
+    console.warn('[statements] retrying after error:', err.message);
+    return await attempt();
+  }
+}
+
+async function fetchAllPages(basePath, pageSize = 200) {
+  let allItems = [];
+  let skip = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const path = `${basePath}${basePath.includes('?') ? '&' : '?'}Skip=${skip}&PageSize=${pageSize}`;
+    const response = await postMessageWithResponse({ type: 'api-request', method: 'GET', path });
+    const items = (response && response.items) || [];
+    allItems = allItems.concat(items);
+    if (items.length < pageSize) hasMore = false;
+    else skip += pageSize;
+  }
+  return allItems;
+}
+
+async function safeFetch(label, fn, fallback = []) {
+  try { return await fn(); }
+  catch (err) { console.warn(`[statements] ${label} failed:`, err); return fallback; }
+}
+
+// ================================================================
+// 2. API WRAPPERS
+// ================================================================
+async function getParties(mode) {
+  const cfg = MODES[mode];
+  return await fetchAllPages(cfg.partyBatch);
+}
+async function getMainControlAccount(mode) {
+  const cfg = MODES[mode];
+  return await safeFetch('main control account',
+    () => postMessageWithResponse({ type: 'api-request', method: 'GET', path: cfg.mainControlAccount }),
+    null
+  );
+}
+async function getControlAccountsBatch(mode) {
+  const cfg = MODES[mode];
+  return await safeFetch('control accounts batch', () => fetchAllPages(cfg.controlAccountsBatch), []);
+}
+async function getInvoices(mode) {
+  const cfg = MODES[mode];
+  return await fetchAllPages(cfg.invoiceBatch);
+}
+async function getCreditNotes(mode) {
+  const cfg = MODES[mode];
+  return await fetchAllPages(cfg.creditNoteBatch);
+}
+async function getAllInvoices() {
+  // Fetch both sales and purchase invoices regardless of mode — needed for cross-type
+  // references on receipt/payment/JE lines (e.g. a receipt line referencing a purchase invoice)
+  const [sales, purchase] = await Promise.all([
+    safeFetch('sales invoices', () => fetchAllPages('/api4/sales-invoice-batch'), []),
+    safeFetch('purchase invoices', () => fetchAllPages('/api4/purchase-invoice-batch'), [])
+  ]);
+  return [...sales, ...purchase];
+}
+async function getPayments() { return await fetchAllPages('/api4/payment-batch'); }
+async function getReceipts() { return await fetchAllPages('/api4/receipt-batch'); }
+async function getJournalEntries() { return await fetchAllPages('/api4/journal-entry-batch'); }
+async function getLatePaymentFees() { return await fetchAllPages('/api4/late-payment-fee-batch'); }
+async function getBankOrCashAccounts() { return await safeFetch('bank accounts', () => fetchAllPages('/api4/bank-or-cash-account-batch'), []); }
+async function getExchangeRates() { return await safeFetch('exchange rates', () => fetchAllPages('/api4/exchange-rate-batch'), []); }
+
+async function getInventoryItems() { return await safeFetch('inventory items', () => fetchAllPages('/api4/inventory-item-batch'), []); }
+async function getNonInventoryItems() { return await safeFetch('non-inventory items', () => fetchAllPages('/api4/non-inventory-item-batch'), []); }
+async function getInventoryKits() { return await safeFetch('inventory kits', () => fetchAllPages('/api4/inventory-kit-batch'), []); }
+async function getBalanceSheetAccounts() { return await safeFetch('balance sheet accounts', () => fetchAllPages('/api4/balance-sheet-account-batch'), []); }
+async function getProfitAndLossAccounts() { return await safeFetch('profit and loss accounts', () => fetchAllPages('/api4/profit-and-loss-statement-account-batch'), []); }
+async function getTaxCodes() { return await safeFetch('tax codes', () => fetchAllPages('/api4/tax-code-batch'), []); }
+
+async function getBaseCurrency() {
+  return await postMessageWithResponse({ type: 'api-request', method: 'GET', path: '/api4/base-currency' });
+}
+async function getForeignCurrenciesByKeys(keys) {
+  if (!keys || keys.length === 0) return [];
+  const query = keys.map(k => `Keys=${encodeURIComponent(k)}`).join('&');
+  const resp = await safeFetch('foreign currencies',
+    () => postMessageWithResponse({ type: 'api-request', method: 'GET', path: `/api4/foreign-currency-batch?${query}` }),
+    null
+  );
+  return (resp && resp.items) || [];
+}
+async function getDateFormat() {
+  return await postMessageWithResponse({ type: 'api-request', method: 'GET', path: '/api4/date-and-number-format' });
+}
+
+// ================================================================
+// 3. GLOBALS & FORMATTING
+// ================================================================
+let dateFormatStr = 'dd/MM/yyyy';
+let allParties = [];
+let currentDisplayRows = [];
+let currentRange = { from: '', to: '' };
+let warnings = { undated: false, controlDegraded: false, zeroLineDocs: false, currencyMismatch: false };
+let activePartyKey = '';
+let currentMode = 'customer';
+let isBatchMode = false;
+
+let currencyCache = {}; // partyKey -> currency object
+let currencyInfoByUuid = {}; // currencyKey -> currency object (including base)
+let baseCurrencyInfo = null;
+let bankCurrencyMap = {};
+let exchangeRateMap = {};
+
+function roundToCurrencyDp(amount, decimals) {
+  const factor = Math.pow(10, decimals);
+  return Math.round(amount * factor) / factor;
+}
+
+function dateOnly(dateStr) {
+  if (!dateStr) return dateStr;
+  return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+}
+
+function formatNumberDp(amount, decimals) {
+  if (amount === undefined || amount === null || isNaN(amount)) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  const rounded = roundToCurrencyDp(num, decimals);
+  let fixed = rounded.toFixed(decimals);
+  if (fixed.includes('.')) fixed = fixed.replace(/0+$/, '').replace(/\.$/, '');
+  const parts = fixed.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.length === 2 ? parts[0] + '.' + parts[1] : parts[0];
+}
+function formatFixed(amount, decimals) {
+  if (amount === undefined || amount === null || isNaN(amount)) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  const dp = (decimals === undefined || decimals === null) ? 2 : decimals;
+  const rounded = roundToCurrencyDp(num, dp);
+  let fixed = rounded.toFixed(dp);
+  const parts = fixed.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.length === 2 ? parts[0] + '.' + parts[1] : parts[0];
+}
+function formatMoneyFor(amount, cur) {
+  if (amount === undefined || amount === null) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  return (cur.symbol || '$') + formatNumberDp(num, cur.decimals === undefined ? 2 : cur.decimals);
+}
+function formatSignedFor(amount, cur) {
+  if (amount === undefined || amount === null) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  const formatted = formatNumberDp(Math.abs(num), cur.decimals === undefined ? 2 : cur.decimals);
+  return num < 0 ? `${cur.symbol} (${formatted})` : cur.symbol + formatted;
+}
+function formatBalanceWithDrCrFor(amount, cur) {
+  if (amount === undefined || amount === null) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  const dp = cur.decimals === undefined || cur.decimals === null ? 2 : cur.decimals;
+  if (num === 0) return formatFixed(0, dp);
+  return formatFixed(Math.abs(num), dp) + (num > 0 ? ' Dr' : ' Cr');
+}
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  dateStr = dateOnly(dateStr);
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  const tokens = { yyyy: y, yy: String(y).slice(-2), MM: String(m).padStart(2,'0'), M: String(m), dd: String(d).padStart(2,'0'), d: String(d) };
+  let fmt = dateFormatStr || 'dd/MM/yyyy';
+  const reps = [['yyyy', tokens.yyyy], ['yy', tokens.yy], ['MM', tokens.MM], ['M', tokens.M], ['dd', tokens.dd], ['d', tokens.d]];
+  for (const [key, val] of reps) fmt = fmt.replace(new RegExp(key, 'g'), val);
+  return fmt;
+}
+
+// ---- Currency resolution (per party, batched) ----
+async function ensureBaseCurrency() {
+  if (baseCurrencyInfo) return baseCurrencyInfo;
+  const base = await safeFetch('base currency', () => getBaseCurrency(), null);
+  const currencyData = (base && base.items && base.items.length > 0) ? base.items[0] : base;
+  baseCurrencyInfo = {
+    symbol: (currencyData && (currencyData.prefix || currencyData.displayPrefix)) || '$',
+    decimals: (currencyData && currencyData.decimalPlaces !== undefined && currencyData.decimalPlaces !== null) ? currencyData.decimalPlaces : 2,
+    code: (currencyData && (currencyData.code || currencyData.displayCode)) || 'USD',
+    key: 'BASE'
+  };
+  currencyInfoByUuid['BASE'] = baseCurrencyInfo;
+  return baseCurrencyInfo;
+}
+
+async function ensureBankCurrencies(bankCurrencyMap) {
+  const uuids = new Set(Object.values(bankCurrencyMap).filter(Boolean));
+  const missing = [...uuids].filter(u => !currencyInfoByUuid[u]);
+  if (missing.length === 0) return;
+  const fetched = await getForeignCurrenciesByKeys(missing);
+  for (const it of fetched) {
+    const c = it.item || it;
+    if (c.key) {
+      currencyInfoByUuid[c.key] = {
+        symbol: c.prefix || c.displayPrefix || '$',
+        decimals: (c.decimalPlaces !== undefined && c.decimalPlaces !== null) ? c.decimalPlaces : 2,
+        code: c.code || c.displayCode || 'USD',
+        key: c.key
+      };
+    }
+  }
+}
+
+async function ensureCurrencyForParties(partyKeys) {
+  const base = await ensureBaseCurrency();
+  const uuidsNeeded = new Set();
+  const keyToUuid = {};
+  for (const key of partyKeys) {
+    if (currencyCache[key]) continue;
+    const party = allParties.find(p => p.key === key);
+    const uuid = party && party.currency;
+    keyToUuid[key] = uuid || null;
+    if (uuid) uuidsNeeded.add(uuid);
+  }
+  let byUuid = {};
+  if (uuidsNeeded.size > 0) {
+    const items = await getForeignCurrenciesByKeys([...uuidsNeeded]);
+    for (const it of items) {
+      const c = it.item || it;
+      if (c.key) {
+        const info = {
+          symbol: c.prefix || c.displayPrefix || '$',
+          decimals: (c.decimalPlaces !== undefined && c.decimalPlaces !== null) ? c.decimalPlaces : 2,
+          code: c.code || c.displayCode || 'USD',
+          key: c.key
+        };
+        byUuid[c.key] = info;
+        currencyInfoByUuid[c.key] = info;
+      }
+    }
+  }
+  for (const key of partyKeys) {
+    if (currencyCache[key]) continue;
+    const uuid = keyToUuid[key];
+    currencyCache[key] = (uuid && byUuid[uuid]) ? byUuid[uuid] : base;
+  }
+}
+
+function currencyFor(partyKey) {
+  return currencyCache[partyKey] || baseCurrencyInfo || { symbol: '$', decimals: 2, code: 'USD', key: 'BASE' };
+}
+
+// ---- Currency decimal helper (now uses currencyInfoByUuid) ----
+function getCurrencyDecimals(currencyKey) {
+  if (!currencyKey) return baseCurrencyInfo.decimals;
+  if (currencyInfoByUuid[currencyKey]) return currencyInfoByUuid[currencyKey].decimals;
+  return baseCurrencyInfo.decimals; // fallback
+}
+
+// ---- Exchange rate helpers ----
+function buildExchangeRateMap(rates) {
+  const map = {};
+  for (const entry of rates) {
+    const r = entry.item || entry;
+    if (!r.currency || !r.exchangeRateValue) continue;
+    const date = dateOnly(r.date);
+    if (!date) continue;
+    if (!map[r.currency]) map[r.currency] = [];
+    map[r.currency].push({
+      date: date,
+      rate: parseFloat(r.exchangeRateValue),
+      isInverse: r.exchangeRateIsInverse === true
+    });
+  }
+  for (const cur in map) {
+    map[cur].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  return map;
+}
+
+function getExchangeRate(currencyKey, date, baseCurKey) {
+  if (currencyKey === baseCurKey) return { rate: 1, isInverse: false };
+  const arr = exchangeRateMap[currencyKey];
+  if (!arr || arr.length === 0) return null;
+  let lo = 0, hi = arr.length - 1, best = -1;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (arr[mid].date <= date) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  if (best === -1) return null;
+  return arr[best];
+}
+
+function convertAmount(amount, fromCurrencyKey, toCurrencyKey, date, baseCurKey) {
+  if (fromCurrencyKey === toCurrencyKey) {
+    const targetDecimals = getCurrencyDecimals(toCurrencyKey);
+    return roundToCurrencyDp(amount, targetDecimals);
+  }
+  const baseDecimals = getCurrencyDecimals(baseCurKey);
+  let amountInBase = amount;
+  if (fromCurrencyKey !== baseCurKey) {
+    const rate = getExchangeRate(fromCurrencyKey, date, baseCurKey);
+    if (!rate) {
+      warnings.currencyMismatch = true;
+      return roundToCurrencyDp(amount, getCurrencyDecimals(toCurrencyKey));
+    }
+    if (rate.isInverse) {
+      amountInBase = amount / rate.rate;
+    } else {
+      amountInBase = amount * rate.rate;
+    }
+    amountInBase = roundToCurrencyDp(amountInBase, baseDecimals);
+  }
+  if (toCurrencyKey === baseCurKey) {
+    return roundToCurrencyDp(amountInBase, baseDecimals);
+  }
+  const rate = getExchangeRate(toCurrencyKey, date, baseCurKey);
+  if (!rate) {
+    warnings.currencyMismatch = true;
+    return roundToCurrencyDp(amount, getCurrencyDecimals(toCurrencyKey));
+  }
+  let result;
+  if (rate.isInverse) {
+    result = amountInBase * rate.rate;
+  } else {
+    result = amountInBase / rate.rate;
+  }
+  const targetDecimals = getCurrencyDecimals(toCurrencyKey);
+  return roundToCurrencyDp(result, targetDecimals);
+}
+
+// ================================================================
+// 4. computeLineAmount - generic (uses price field from config)
+// ================================================================
+function computeLineAmount(line, priceField, discountEnabled, discountType) {
+  let qty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+  const price = parseFloat(line[priceField]) || 0;
+  const amount = parseFloat(line.amount) || 0;
+  const totalBeforeTax = parseFloat(line.totalBeforeTax) || 0;
+  const total = parseFloat(line.total) || 0;
+  const discPct = parseFloat(line.discountPercentage) || 0;
+  const discAmt = parseFloat(line.discountAmount) || 0;
+
+  if (qty === 0) {
+    let base = 0;
+    if (amount !== 0) base = amount;
+    else if (totalBeforeTax !== 0) base = totalBeforeTax;
+    else if (total !== 0) base = total;
+    if (discountEnabled) {
+      if (discountType === 0 && discPct !== 0) base = base * (1 - discPct / 100);
+      else if (discountType === 1 && discAmt !== 0) base = base - discAmt;
+    }
+    return base;
+  }
+
+  const effectiveQty = (qty === null || isNaN(qty)) ? 1 : qty;
+  let base = 0;
+  if (effectiveQty !== 0 && price !== 0) {
+    base = effectiveQty * price;
+  } else if (amount !== 0) {
+    base = amount;
+  } else if (totalBeforeTax !== 0) {
+    base = totalBeforeTax;
+  } else if (total !== 0) {
+    base = total;
+  }
+
+  if (discountEnabled) {
+    if (discountType === 0 && discPct !== 0) base = base * (1 - discPct / 100);
+    else if (discountType === 1 && discAmt !== 0) base = base - discAmt;
+  }
+  return base;
+}
+
+// ================================================================
+// 5. Reference maps
+// ================================================================
+function buildItemMap(inventoryItems, nonInventoryItems, inventoryKits) {
+  const map = {};
+  for (const entry of inventoryItems) {
+    const it = entry.item || entry;
+    if (it.key) map[it.key] = { name: it.itemName || it.name || '', unit: it.unitName || '' };
+  }
+  for (const entry of nonInventoryItems) {
+    const it = entry.item || entry;
+    if (it.key) map[it.key] = { name: it.name || '', unit: it.unitName || '' };
+  }
+  for (const entry of inventoryKits) {
+    const it = entry.item || entry;
+    if (it.key) map[it.key] = { name: it.itemName || it.name || '', unit: it.unitName || '' };
+  }
+  return map;
+}
+function buildAccountMap(balanceSheetAccounts, profitAndLossAccounts) {
+  const map = {};
+  for (const entry of balanceSheetAccounts) {
+    const ac = entry.item || entry;
+    if (ac.key) map[ac.key] = ac.nameWithCode || ac.name || '';
+  }
+  for (const entry of profitAndLossAccounts) {
+    const ac = entry.item || entry;
+    if (ac.key) map[ac.key] = ac.nameWithCode || ac.name || '';
+  }
+  return map;
+}
+function buildTaxCodeMap(taxCodes) {
+  const map = {};
+  for (const entry of taxCodes) {
+    const tc = entry.item || entry;
+    if (!tc.key) continue;
+    const displayName = tc.label || tc.name || tc.code || 'Tax';
+    const components = [];
+    if (tc.components && tc.components.length > 0) {
+      for (const comp of tc.components) {
+        const rate = parseFloat(comp.componentRate) || 0;
+        if (rate !== 0) components.push({ name: comp.name || 'Tax', rate });
+      }
+    }
+    const effectiveRate = components.length > 0 ? components.reduce((sum, c) => sum + c.rate, 0) : (parseFloat(tc.rate) || 0);
+    map[tc.key] = { displayName, rate: effectiveRate, components };
+  }
+  return map;
+}
+function buildInvoiceMap(invoices) {
+  const map = {};
+  for (const entry of invoices) {
+    const inv = entry.item || entry;
+    if (inv.key && inv.reference) map[inv.key] = inv.reference;
+  }
+  return map;
+}
+
+// ================================================================
+// 6. INDEXING FUNCTIONS
+// ================================================================
+function indexByTopLevelParty(items, headerField) {
+  const map = new Map();
+  for (const entry of items) {
+    const doc = entry.item || entry;
+    if (!doc[headerField]) continue;
+    if (!map.has(doc[headerField])) map.set(doc[headerField], []);
+    map.get(doc[headerField]).push(entry);
+  }
+  return map;
+}
+
+function indexJournalsByParty(journals, linePartyField) {
+  const map = new Map();
+  for (const entry of journals) {
+    const j = entry.item || entry;
+    const lines = j.lines || [];
+    const parties = new Set();
+    for (const line of lines) {
+      if (line.item != null && line.item !== '') continue;
+      if (line[linePartyField]) parties.add(line[linePartyField]);
+    }
+    for (const p of parties) {
+      if (!map.has(p)) map.set(p, []);
+      map.get(p).push(entry);
+    }
+  }
+  return map;
+}
+
+function indexCashDocsByParty(docs, controlAccountKeys, linePartyField, payeeValue, headerPartyField) {
+  const map = new Map();
+  for (const entry of docs) {
+    const doc = entry.item || entry;
+    const lines = doc.lines || [];
+    const paidBy = getPayeeType(doc);
+    const headerParty = doc[headerPartyField];
+    const partiesForDoc = new Set();
+    for (const line of lines) {
+      if (line.item != null && line.item !== '') continue;
+      if (!(line.account && controlAccountKeys.includes(line.account))) continue;
+      let partyKey = null;
+      if (paidBy === payeeValue) {
+        partyKey = headerParty;
+      } else {
+        partyKey = line[linePartyField];
+      }
+      if (!partyKey && headerParty) partyKey = headerParty;
+      if (!partyKey) partyKey = line[linePartyField];
+      if (partyKey) partiesForDoc.add(partyKey);
+    }
+    for (const p of partiesForDoc) {
+      if (!map.has(p)) map.set(p, []);
+      map.get(p).push(entry);
+    }
+  }
+  return map;
+}
+function forParty(indexMap, partyKey) {
+  return indexMap.get(partyKey) || [];
+}
+
+// ================================================================
+// 7. EXTRACTION FUNCTIONS
+// ================================================================
+
+// ---- Invoices ----
+function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxCodeMap, dp) {
+  const cfg = MODES[mode];
+  const priceField = cfg.invoiceLinePriceField;
+  const isDebit = cfg.invoiceIsDebit;
+  const result = [];
+  for (const entry of invoices) {
+    const inv = entry.item || entry;
+    const lines = inv.lines || [];
+    const details = [];
+    let sumTotal = 0;
+    const amountsIncludeTax = inv.amountsIncludeTax === true;
+    const discountEnabled = inv.discount === true;
+    const discountType = inv.discountType || 0;
+
+    for (const line of lines) {
+      let desc = line.lineDescription || '';
+      if (!desc) {
+        if (line.item && itemMap[line.item]) desc = itemMap[line.item].name || '';
+        else if (line.account && accountMap[line.account]) desc = accountMap[line.account] || '';
+      }
+      const qty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+      const price = parseFloat(line[priceField]) || 0;
+      let unitName = '';
+      if (line.item && itemMap[line.item]) unitName = itemMap[line.item].unit || '';
+
+      let discountText = '';
+      if (discountEnabled) {
+        if (discountType === 0 && parseFloat(line.discountPercentage) > 0) discountText = `Disc. ${line.discountPercentage}%`;
+        else if (discountType === 1 && parseFloat(line.discountAmount) !== 0) discountText = `Disc. ${formatMoneyFor(parseFloat(line.discountAmount), currencyFor(partyKey))}`;
+      }
+
+      const basePreTax = roundToCurrencyDp(computeLineAmount(line, priceField, discountEnabled, discountType), dp);
+      let taxAmount = 0, taxDisplay = null, total = 0, baseAmount = basePreTax;
+
+      if (amountsIncludeTax) {
+        const totalIncl = basePreTax;
+        if (line.taxCode && taxCodeMap[line.taxCode]) {
+          const tc = taxCodeMap[line.taxCode];
+          const rate = tc.rate / 100;
+          const base = roundToCurrencyDp(totalIncl / (1 + rate), dp);
+          const tax = roundToCurrencyDp(totalIncl - base, dp);
+          baseAmount = base; taxAmount = tax; total = totalIncl;
+          taxDisplay = tc.components.length > 0
+            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(base * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
+            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
+        } else { total = totalIncl; baseAmount = totalIncl; }
+      } else {
+        baseAmount = basePreTax;
+        if (line.taxCode && taxCodeMap[line.taxCode]) {
+          const tc = taxCodeMap[line.taxCode];
+          const rate = tc.rate / 100;
+          const tax = roundToCurrencyDp(baseAmount * rate, dp);
+          taxAmount = tax; total = roundToCurrencyDp(baseAmount + tax, dp);
+          taxDisplay = tc.components.length > 0
+            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(baseAmount * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
+            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
+        } else { total = baseAmount; }
+      }
+
+      sumTotal = roundToCurrencyDp(sumTotal + total, dp);
+      details.push({ description: desc, qty, unitName, price, baseAmount, taxAmount, total, discountText, taxDisplay });
+    }
+
+    // Freight In / Landed Cost Lines (for purchase invoices)
+    // Only include if at least one main line has an inventory item
+    if (inv.freightIn === true && inv.landedCostLines && inv.landedCostLines.length > 0) {
+      const hasInventoryItem = lines.some(line => line.item != null && line.item !== '' && itemMap[line.item]);
+      if (hasInventoryItem) {
+        for (const lc of inv.landedCostLines) {
+          const desc = lc.landedCostDescription || 'Freight In';
+          const amount = parseFloat(lc.landedCostAmount) || 0;
+          if (amount === 0) continue;
+          const basePreTax = roundToCurrencyDp(amount, dp);
+          let taxAmount = 0, taxDisplay = null, total = basePreTax, baseAmount = basePreTax;
+          if (lc.landedCostTaxCode && taxCodeMap[lc.landedCostTaxCode]) {
+            const tc = taxCodeMap[lc.landedCostTaxCode];
+            if (amountsIncludeTax) {
+              const rate = tc.rate / 100;
+              const base = roundToCurrencyDp(basePreTax / (1 + rate), dp);
+              const tax = roundToCurrencyDp(basePreTax - base, dp);
+              baseAmount = base; taxAmount = tax; total = basePreTax;
+              taxDisplay = tc.components.length > 0
+                ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(base * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
+                : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
+            } else {
+              const rate = tc.rate / 100;
+              const tax = roundToCurrencyDp(basePreTax * rate, dp);
+              taxAmount = tax; total = roundToCurrencyDp(basePreTax + tax, dp);
+              taxDisplay = tc.components.length > 0
+                ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(basePreTax * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
+                : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
+            }
+          }
+          sumTotal = roundToCurrencyDp(sumTotal + total, dp);
+          details.push({
+            description: desc,
+            qty: null, unitName: '', price: 0,
+            baseAmount, taxAmount, total,
+            discountText: '', taxDisplay
+          });
+        }
+      }
+    }
+
+    const ref = inv.reference || '';
+    const timestamp = parseFloat(inv.timestamp) || 0;
+
+    let invoiceTotal;
+    if (lines.length === 0 && (!inv.landedCostLines || inv.landedCostLines.length === 0)) {
+      invoiceTotal = 0;
+      warnings.zeroLineDocs = true;
+      console.warn(`[statements] Invoice ${ref || inv.key} has no lines; amount defaulted to 0.`);
+    } else {
+      invoiceTotal = sumTotal;
+    }
+
+    if (mode === 'customer' && inv.rounding === true && inv.roundingMethod && lines.length > 0) {
+      const preciseTotal = roundToCurrencyDp(invoiceTotal, dp);
+      let rounded;
+      if (inv.roundingMethod === 1) rounded = Math.round(preciseTotal);
+      else if (inv.roundingMethod === 2) rounded = Math.floor(preciseTotal);
+      else rounded = preciseTotal;
+      const adjustment = roundToCurrencyDp(rounded - invoiceTotal, dp);
+      if (adjustment !== 0) {
+        details.push({
+          description: 'Rounding',
+          qty: null, unitName: '', price: 0,
+          baseAmount: adjustment, taxAmount: 0, total: adjustment,
+          discountText: '', taxDisplay: null, noNumber: true
+        });
+      }
+      invoiceTotal = roundToCurrencyDp(rounded, dp);
+    }
+
+
+    let displayType = 'Invoice';
+    if (mode === 'customer') {
+      if (inv.hasSalesInvoiceCustomTitle && inv.salesInvoiceCustomTitle) {
+        displayType = inv.salesInvoiceCustomTitle;
+      } else {
+        displayType = 'Invoice';
+      }
+    } else {
+      displayType = 'Invoice';
+    }
+
+    result.push({
+      transactionKey: inv.key,
+      type: mode === 'customer' ? 'Invoice' : 'Purchase Invoice',
+      displayType: displayType,
+      reference: ref,
+      timestamp,
+      date: inv.issueDate,
+      displayRef: ref ? `#${ref}` : '',
+      displayDescription: inv.description || null,
+      amount: isDebit ? invoiceTotal : -invoiceTotal,
+      isDebit: isDebit,
+      isCredit: !isDebit,
+      lineDetails: details
+    });
+
+    if (inv.withholdingTax === true) {
+      const whType = inv.withholdingTaxType || 0;
+      let whAmount = 0;
+      if (whType === 0) {
+        const pct = parseFloat(inv.withholdingTaxPercentage) || 0;
+        whAmount = roundToCurrencyDp(invoiceTotal * (pct / 100), dp);
+      } else {
+        whAmount = roundToCurrencyDp(parseFloat(inv.withholdingTaxAmount) || 0, dp);
+      }
+      if (whAmount > 0) {
+          const whtDesc = ref ? `Invoice #${ref}` : 'Invoice';
+        result.push({
+          transactionKey: inv.key + '-wht',
+          type: 'Withholding Tax',
+          displayType: 'Withholding Tax',
+          reference: ref,
+          timestamp,
+          date: inv.issueDate,
+          displayRef: '',
+          displayDescription: whtDesc,
+          amount: isDebit ? -whAmount : whAmount,
+          isDebit: !isDebit,
+          isCredit: isDebit,
+          lineDetails: []
+        });
+      }
+    }
+  }
+  return result;
+}
+
+// ---- Credit Notes / Debit Notes ----
+function extractCreditNotes(creditNotes, partyKey, mode, itemMap, accountMap, taxCodeMap, dp) {
+  const cfg = MODES[mode];
+  const priceField = cfg.invoiceLinePriceField;
+  const isDebit = cfg.creditNoteIsDebit;
+  const result = [];
+  for (const entry of creditNotes) {
+    const cn = entry.item || entry;
+    const lines = cn.lines || [];
+    const details = [];
+    let sumTotal = 0;
+    const amountsIncludeTax = cn.amountsIncludeTax === true;
+    const discountEnabled = cn.discount === true;
+    const discountType = cn.discountType || 0;
+
+    for (const line of lines) {
+      let desc = line.lineDescription || '';
+      if (!desc) {
+        if (line.item && itemMap[line.item]) desc = itemMap[line.item].name || '';
+        else if (line.account && accountMap[line.account]) desc = accountMap[line.account] || '';
+      }
+      const qty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+      const price = parseFloat(line[priceField]) || 0;
+      let unitName = '';
+      if (line.item && itemMap[line.item]) unitName = itemMap[line.item].unit || '';
+
+      let discountText = '';
+      if (discountEnabled) {
+        if (discountType === 0 && parseFloat(line.discountPercentage) > 0) discountText = `Disc. ${line.discountPercentage}%`;
+        else if (discountType === 1 && parseFloat(line.discountAmount) !== 0) discountText = `Disc. ${formatMoneyFor(parseFloat(line.discountAmount), currencyFor(partyKey))}`;
+      }
+
+      const basePreTax = roundToCurrencyDp(computeLineAmount(line, priceField, discountEnabled, discountType), dp);
+      let taxAmount = 0, taxDisplay = null, total = 0, baseAmount = basePreTax;
+
+      if (amountsIncludeTax) {
+        const totalIncl = basePreTax;
+        if (line.taxCode && taxCodeMap[line.taxCode]) {
+          const tc = taxCodeMap[line.taxCode];
+          const rate = tc.rate / 100;
+          const base = roundToCurrencyDp(totalIncl / (1 + rate), dp);
+          const tax = roundToCurrencyDp(totalIncl - base, dp);
+          baseAmount = base; taxAmount = tax; total = totalIncl;
+          taxDisplay = tc.components.length > 0
+            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(base * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
+            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
+        } else { total = totalIncl; baseAmount = totalIncl; }
+      } else {
+        baseAmount = basePreTax;
+        if (line.taxCode && taxCodeMap[line.taxCode]) {
+          const tc = taxCodeMap[line.taxCode];
+          const rate = tc.rate / 100;
+          const tax = roundToCurrencyDp(baseAmount * rate, dp);
+          taxAmount = tax; total = roundToCurrencyDp(baseAmount + tax, dp);
+          taxDisplay = tc.components.length > 0
+            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(baseAmount * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
+            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
+        } else { total = baseAmount; }
+      }
+
+      sumTotal = roundToCurrencyDp(sumTotal + total, dp);
+      details.push({ description: desc, qty, unitName, price, baseAmount, taxAmount, total, discountText, taxDisplay });
+    }
+
+    const ref = cn.reference || '';
+    const timestamp = parseFloat(cn.timestamp) || 0;
+
+    let amountTotal;
+    if (lines.length === 0) {
+      amountTotal = 0;
+      warnings.zeroLineDocs = true;
+      console.warn(`[statements] Credit note ${ref || cn.key} has no lines; amount defaulted to 0.`);
+    } else {
+      amountTotal = roundToCurrencyDp(sumTotal, dp);
+    }
+
+    let displayType = mode === 'customer' ? 'Credit Note' : 'Debit Note';
+    if (mode === 'customer' && cn.hasCreditNoteCustomTitle && cn.creditNoteCustomTitle) {
+      displayType = cn.creditNoteCustomTitle;
+    }
+
+    // WHT on credit/debit notes goes as a detail row at the end (not a separate transaction)
+    // The WHT amount is deducted from the CN's net amount (as Manager does)
+    if (cn.withholdingTax === true) {
+      const whType = cn.withholdingTaxType || 0;
+      let whAmount = 0;
+      if (whType === 0) {
+        const rate = parseFloat(cn.withholdingTaxRate) || 0;
+        whAmount = roundToCurrencyDp(amountTotal * (rate / 100), dp);
+      } else {
+        whAmount = roundToCurrencyDp(parseFloat(cn.withholdingTaxAmount) || 0, dp);
+      }
+      if (whAmount > 0) {
+        // WHT is opposite sign to the CN: show as negative total (Less: WHT)
+        const whtDetailAmount = isDebit ? whAmount : -whAmount;
+        details.push({
+          description: 'Withholding Tax',
+          qty: null, unitName: '', price: 0,
+          baseAmount: whtDetailAmount, taxAmount: 0, total: whtDetailAmount,
+          discountText: '', taxDisplay: null, noNumber: true
+        });
+        // Deduct WHT from the net amount shown on the main transaction row
+        amountTotal = roundToCurrencyDp(amountTotal - whAmount, dp);
+      }
+    }
+
+    result.push({
+      transactionKey: cn.key,
+      type: mode === 'customer' ? 'Credit Note' : 'Debit Note',
+      displayType: displayType,
+      reference: ref,
+      timestamp,
+      date: cn.issueDate,
+      displayRef: ref ? `#${ref}` : '',
+      displayDescription: cn.description || null,
+      amount: isDebit ? amountTotal : -amountTotal,
+      isDebit: isDebit,
+      isCredit: !isDebit,
+      lineDetails: details
+    });
+  }
+  return result;
+}
+
+// ---- Receipts ----
+function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap) {
+  const cfg = MODES[mode];
+  const linePartyField = cfg.linePartyField;
+  const payeeValue = cfg.payeeValue;
+  const result = [];
+  const partyCur = currencyFor(partyKey);
+  const partyCurKey = partyCur.key;
+  const partyDecimals = getCurrencyDecimals(partyCurKey);
+
+  for (const entry of receipts) {
+    const r = entry.item || entry;
+    const lines = r.lines || [];
+    const paidBy = getPayeeType(r);
+    const headerParty = r[cfg.headerPartyField];
+
+    const bankAccKey = r.receivedIn;
+    const docCurKey = bankAccKey ? (bankCurrencyMap[bankAccKey] || null) : null;
+    const docCurKeyEffective = docCurKey || baseCurKey;
+    const docDecimals = getCurrencyDecimals(docCurKeyEffective);
+    const relevantLines = [];
+    for (const line of lines) {
+      if (line.item != null && line.item !== '') continue;
+      if (!(line.account && controlAccountKeys.includes(line.account))) continue;
+      let lineParty = null;
+      if (paidBy === payeeValue) {
+        lineParty = headerParty;
+      } else {
+        lineParty = line[linePartyField];
+      }
+      if (!lineParty && headerParty) lineParty = headerParty;
+      if (!lineParty) lineParty = line[linePartyField];
+      if (lineParty === partyKey) relevantLines.push(line);
+    }
+    if (relevantLines.length === 0) continue;
+
+    const unitPriceMode = r.unitPriceColumn === true;
+    const discountEnabled = r.discount === true;
+    const discountType = r.discountType || 0;
+    const priceField = cfg.invoiceLinePriceField;
+
+    const details = [];
+    let sumAmount = 0;
+    let singleInvoiceRef = null;
+
+    let displayDesc = r.description || null;
+    if (relevantLines.length === 1 && r.hasLineDescription === true) {
+      const line = relevantLines[0];
+      if (line.lineDescription) {
+        displayDesc = line.lineDescription;
+      }
+    }
+
+    let displayType = 'Receipt';
+    if (r.hasReceiptCustomTitle && r.receiptCustomTitle) {
+      displayType = r.receiptCustomTitle;
+    }
+
+    for (const line of relevantLines) {
+      // Qty/unit/price for display
+      let qtyValue = null;
+      let unitName = '';
+      let priceValue = 0;
+      if (r.quantityColumn === true) {
+        qtyValue = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+        if (qtyValue !== null && qtyValue !== 0) {
+          if (line.item && itemMap[line.item]) {
+            unitName = itemMap[line.item].unit || '';
+          }
+          priceValue = parseFloat(line[priceField]) || 0;
+        }
+      }
+
+      // Amount in document currency:
+      //   unitPriceColumn + quantityColumn → qty * unitPrice
+      //   unitPriceColumn only            → unitPrice
+      //   neither                         → line.amount
+      let amountInDocCur = 0;
+      const linePrice = parseFloat(line[priceField]) || 0;
+      const lineQty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+      if (unitPriceMode && r.quantityColumn === true) {
+        const effectiveQty = (lineQty === null || isNaN(lineQty)) ? 1 : lineQty;
+        amountInDocCur = effectiveQty * linePrice;
+      } else if (unitPriceMode) {
+        amountInDocCur = linePrice;
+      } else {
+        amountInDocCur = parseFloat(line.amount) || 0;
+      }
+      // Apply discount if enabled — regardless of unitPriceMode
+      if (discountEnabled) {
+        const discPct = parseFloat(line.discountPercentage) || 0;
+        const discAmt = parseFloat(line.discountAmount) || 0;
+        if (discountType === 0 && discPct !== 0) amountInDocCur = amountInDocCur * (1 - discPct / 100);
+        else if (discountType === 1 && discAmt !== 0) amountInDocCur = amountInDocCur - discAmt;
+      }
+      amountInDocCur = roundToCurrencyDp(amountInDocCur, docDecimals);
+
+      // Currency conversion:
+      //   same currency                          → amountInDocCur as-is
+      //   different currency, currencyAmount set → use currencyAmount directly
+      //   different currency, no currencyAmount  → convert via rate map
+      let finalAmount = amountInDocCur;
+      const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
+      if (docCurKeyEffective !== partyCurKey && lineCurrencyAmount !== 0) {
+        finalAmount = lineCurrencyAmount;
+      } else if (docCurKeyEffective !== partyCurKey) {
+        finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(r.date), baseCurKey);
+      }
+      finalAmount = roundToCurrencyDp(finalAmount, partyDecimals);
+      sumAmount = roundToCurrencyDp(sumAmount + finalAmount, partyDecimals);
+
+      let desc = line.lineDescription || '';
+      if (!desc && line.account && accountMap[line.account]) desc = accountMap[line.account];
+
+      let invRef = null;
+      const invRefKey = line.accountsReceivableSalesInvoice || line.purchaseInvoice || null;
+      if (invRefKey && invoiceMap[invRefKey]) {
+        invRef = invoiceMap[invRefKey];
+        if (relevantLines.length === 1) singleInvoiceRef = invRef;
+        else desc = desc ? `${desc} (Inv #${invRef})` : `(Inv #${invRef})`;
+      }
+
+      details.push({
+        description: desc,
+        qty: qtyValue,
+        unitName: unitName,
+        price: priceValue,
+        baseAmount: finalAmount,
+        taxAmount: 0,
+        total: finalAmount,
+        discountText: '',
+        taxDisplay: null
+      });
+    }
+
+    const ref = r.reference || '';
+    if (relevantLines.length === 1 && singleInvoiceRef) {
+      displayDesc = displayDesc ? `${displayDesc} (Inv #${singleInvoiceRef})` : `Inv #${singleInvoiceRef}`;
+    }
+
+    result.push({
+      transactionKey: r.key,
+      type: 'Receipt',
+      displayType: displayType,
+      reference: ref,
+      timestamp: parseFloat(r.timestamp) || 0,
+      date: r.date || r.issueDate,
+      displayRef: ref ? `#${ref}` : '',
+      displayDescription: displayDesc,
+      amount: -sumAmount,
+      isDebit: false,
+      isCredit: true,
+      lineDetails: relevantLines.length > 1 ? details : []
+    });
+  }
+  return result;
+}
+
+// ---- Payments ----
+function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap) {
+  const cfg = MODES[mode];
+  const linePartyField = cfg.linePartyField;
+  const payeeValue = cfg.payeeValue;
+  const isDebit = cfg.paymentIsDebit;
+  const result = [];
+  const partyCur = currencyFor(partyKey);
+  const partyCurKey = partyCur.key;
+  const partyDecimals = getCurrencyDecimals(partyCurKey);
+
+  for (const entry of payments) {
+    const p = entry.item || entry;
+    const lines = p.lines || [];
+    const paidBy = getPayeeType(p);
+    const headerParty = p[cfg.headerPartyField];
+
+    const bankAccKey = p.paidFrom;
+    const docCurKey = bankAccKey ? (bankCurrencyMap[bankAccKey] || null) : null;
+    const docCurKeyEffective = docCurKey || baseCurKey;
+    const docDecimals = getCurrencyDecimals(docCurKeyEffective);
+    const relevantLines = [];
+    for (const line of lines) {
+      if (line.item != null && line.item !== '') continue;
+      if (!(line.account && controlAccountKeys.includes(line.account))) continue;
+      let lineParty = null;
+      if (paidBy === payeeValue) {
+        lineParty = headerParty;
+      } else {
+        lineParty = line[linePartyField];
+      }
+      if (!lineParty && headerParty) lineParty = headerParty;
+      if (!lineParty) lineParty = line[linePartyField];
+      if (lineParty === partyKey) relevantLines.push(line);
+    }
+    if (relevantLines.length === 0) continue;
+
+    const unitPriceMode = p.unitPriceColumn === true;
+    const discountEnabled = p.discount === true;
+    const discountType = p.discountType || 0;
+    const priceField = cfg.invoiceLinePriceField;
+
+    const details = [];
+    let sumAmount = 0;
+    let singleInvoiceRef = null;
+
+    let displayDesc = p.description || null;
+    if (relevantLines.length === 1 && p.hasLineDescription === true) {
+      const line = relevantLines[0];
+      if (line.lineDescription) {
+        displayDesc = line.lineDescription;
+      }
+    }
+
+    let displayType = 'Payment';
+    if (p.hasPaymentCustomTitle && p.paymentCustomTitle) {
+      displayType = p.paymentCustomTitle;
+    }
+
+    for (const line of relevantLines) {
+      // Qty/unit/price for display
+      let qtyValue = null;
+      let unitName = '';
+      let priceValue = 0;
+      if (p.quantityColumn === true) {
+        qtyValue = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+        if (qtyValue !== null && qtyValue !== 0) {
+          if (line.item && itemMap[line.item]) {
+            unitName = itemMap[line.item].unit || '';
+          }
+          priceValue = parseFloat(line[priceField]) || 0;
+        }
+      }
+
+      // Amount in document currency:
+      //   unitPriceColumn + quantityColumn → qty * unitPrice
+      //   unitPriceColumn only            → unitPrice
+      //   neither                         → line.amount
+      let amountInDocCur = 0;
+      const linePrice = parseFloat(line[priceField]) || 0;
+      const lineQty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
+      if (unitPriceMode && p.quantityColumn === true) {
+        const effectiveQty = (lineQty === null || isNaN(lineQty)) ? 1 : lineQty;
+        amountInDocCur = effectiveQty * linePrice;
+      } else if (unitPriceMode) {
+        amountInDocCur = linePrice;
+      } else {
+        amountInDocCur = parseFloat(line.amount) || 0;
+      }
+      // Apply discount if enabled — regardless of unitPriceMode
+      if (discountEnabled) {
+        const discPct = parseFloat(line.discountPercentage) || 0;
+        const discAmt = parseFloat(line.discountAmount) || 0;
+        if (discountType === 0 && discPct !== 0) amountInDocCur = amountInDocCur * (1 - discPct / 100);
+        else if (discountType === 1 && discAmt !== 0) amountInDocCur = amountInDocCur - discAmt;
+      }
+      amountInDocCur = roundToCurrencyDp(amountInDocCur, docDecimals);
+
+      // Currency conversion:
+      //   same currency                          → amountInDocCur as-is
+      //   different currency, currencyAmount set → use currencyAmount directly
+      //   different currency, no currencyAmount  → convert via rate map
+      let finalAmount = amountInDocCur;
+      const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
+      if (docCurKeyEffective !== partyCurKey && lineCurrencyAmount !== 0) {
+        finalAmount = lineCurrencyAmount;
+      } else if (docCurKeyEffective !== partyCurKey) {
+        finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(p.date), baseCurKey);
+      }
+      finalAmount = roundToCurrencyDp(finalAmount, partyDecimals);
+      sumAmount = roundToCurrencyDp(sumAmount + finalAmount, partyDecimals);
+
+      let desc = line.lineDescription || '';
+      if (!desc && line.account && accountMap[line.account]) desc = accountMap[line.account];
+
+      let invRef = null;
+      const invRefKey = line.accountsReceivableSalesInvoice || line.purchaseInvoice || null;
+      if (invRefKey && invoiceMap[invRefKey]) {
+        invRef = invoiceMap[invRefKey];
+        if (relevantLines.length === 1) singleInvoiceRef = invRef;
+        else desc = desc ? `${desc} (Inv #${invRef})` : `(Inv #${invRef})`;
+      }
+
+      details.push({
+        description: desc,
+        qty: qtyValue,
+        unitName: unitName,
+        price: priceValue,
+        baseAmount: finalAmount,
+        taxAmount: 0,
+        total: finalAmount,
+        discountText: '',
+        taxDisplay: null
+      });
+    }
+
+    const ref = p.reference || '';
+    if (relevantLines.length === 1 && singleInvoiceRef) {
+      displayDesc = displayDesc ? `${displayDesc} (Inv #${singleInvoiceRef})` : `Inv #${singleInvoiceRef}`;
+    }
+
+    result.push({
+      transactionKey: p.key,
+      type: 'Payment',
+      displayType: displayType,
+      reference: ref,
+      timestamp: parseFloat(p.timestamp) || 0,
+      date: p.date || p.issueDate,
+      displayRef: ref ? `#${ref}` : '',
+      displayDescription: displayDesc,
+      amount: isDebit ? sumAmount : -sumAmount,
+      isDebit: isDebit,
+      isCredit: !isDebit,
+      lineDetails: relevantLines.length > 1 ? details : []
+    });
+  }
+  return result;
+}
+
+// ---- Journal Entries (badge uses line description or narration) ----
+function extractJournalEntries(journals, partyKey, mode, accountMap, invoiceMap, dp, baseCurKey) {
+  const cfg = MODES[mode];
+  const linePartyField = cfg.linePartyField;
+  const result = [];
+  const partyCur = currencyFor(partyKey);
+  const partyCurKey = partyCur.key;
+  const partyDecimals = getCurrencyDecimals(partyCurKey);
+  const baseDecimals = getCurrencyDecimals(baseCurKey);
+
+  for (const entry of journals) {
+    const j = entry.item || entry;
+    const lines = j.lines || [];
+    const relevantLines = lines.filter(line => {
+      if (line.item != null && line.item !== '') return false;
+      return line[linePartyField] === partyKey;
+    });
+    if (relevantLines.length === 0) continue;
+
+    // Document-level currency (null = base currency)
+    const docCurKey = j.currency || null;
+    const docCurKeyEffective = docCurKey || baseCurKey;
+    const docDecimals = getCurrencyDecimals(docCurKeyEffective);
+
+    // Document-level exchange rate (0 means not set)
+    const docExRate = parseFloat(j.exchangeRate) || 0;
+    const docExRateIsInverse = j.exchangeRateIsInverse === true;
+
+    const details = [];
+    let netAmount = 0;
+    let singleInvoiceRef = null;
+
+    // displayDescription: line description (single line + hasLineDescription) → narration → null
+    let displayDesc = j.narration || null;
+    if (relevantLines.length === 1 && j.hasLineDescription === true) {
+      const line = relevantLines[0];
+      if (line.lineDescription) displayDesc = line.lineDescription;
+    }
+
+    for (const line of relevantLines) {
+      const debit = parseFloat(line.debit) || 0;
+      const credit = parseFloat(line.credit) || 0;
+      // debit/credit are always in base currency
+      const amountInBase = roundToCurrencyDp(debit - credit, baseDecimals);
+
+      let finalAmount;
+      const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
+
+      if (docCurKeyEffective === partyCurKey) {
+        // Same currency - use base amount directly, no conversion.
+        finalAmount = amountInBase;
+      } else if (lineCurrencyAmount !== 0) {
+        // Different currency, Manager stored party-currency amount - use it directly.
+        finalAmount = lineCurrencyAmount;
+      } else if (docExRate !== 0) {
+        // Different currency, no currencyAmount - convert using doc-level exchange rate.
+        if (docExRateIsInverse) {
+          finalAmount = roundToCurrencyDp(amountInBase / docExRate, partyDecimals);
+        } else {
+          finalAmount = roundToCurrencyDp(amountInBase * docExRate, partyDecimals);
+        }
+      } else {
+        // No currencyAmount, no doc rate - fall back to rate map.
+        finalAmount = convertAmount(amountInBase, baseCurKey, partyCurKey, dateOnly(j.date), baseCurKey);
+      }
+
+      finalAmount = roundToCurrencyDp(finalAmount, partyDecimals);
+      netAmount = roundToCurrencyDp(netAmount + finalAmount, partyDecimals);
+
+      let desc = line.lineDescription || '';
+      if (!desc && line.account && accountMap[line.account]) desc = accountMap[line.account];
+
+      let invRef = null;
+      const invRefKey = line.accountsReceivableSalesInvoice || line.purchaseInvoice || null;
+      if (invRefKey && invoiceMap[invRefKey]) {
+        invRef = invoiceMap[invRefKey];
+        if (relevantLines.length === 1) singleInvoiceRef = invRef;
+        else desc = desc ? `${desc} (Inv #${invRef})` : `(Inv #${invRef})`;
+      }
+
+      details.push({
+        description: desc,
+        qty: null,
+        unitName: '',
+        price: 0,
+        baseAmount: finalAmount,
+        taxAmount: 0,
+        total: finalAmount,
+        discountText: '',
+        taxDisplay: null
+      });
+    }
+
+    const ref = j.reference || '';
+    if (relevantLines.length === 1 && singleInvoiceRef) {
+      displayDesc = displayDesc ? `${displayDesc} (Inv #${singleInvoiceRef})` : `Inv #${singleInvoiceRef}`;
+    }
+
+    const isDebit = netAmount > 0;
+    result.push({
+      transactionKey: j.key,
+      type: 'Journal Entry',
+      reference: ref,
+      timestamp: parseFloat(j.timestamp) || 0,
+      date: j.date || j.issueDate,
+      displayRef: ref ? `#${ref}` : '',
+      displayDescription: displayDesc,
+      amount: netAmount,
+      isDebit: isDebit,
+      isCredit: !isDebit,
+      lineDetails: relevantLines.length > 1 ? details : []
+    });
+  }
+  return result;
+}
+
+// ---- Late Payment Fees (only for customers) ----
+function extractLatePaymentFees(fees, partyKey, invoiceMap, dp) {
+  const result = [];
+  for (const entry of fees) {
+    const fee = entry.item || entry;
+    const amount = roundToCurrencyDp(parseFloat(fee.amount) || 0, dp);
+    const ref = fee.reference || '';
+    const invRef = fee.salesInvoice && invoiceMap[fee.salesInvoice] ? invoiceMap[fee.salesInvoice] : '';
+    const displayDesc = invRef ? `Invoice #${invRef}` : null;
+    result.push({
+      transactionKey: fee.key,
+      type: 'Late Fee',
+      displayType: 'Late Fee',
+      reference: ref,
+      timestamp: parseFloat(fee.timestamp) || 0,
+      date: fee.date || fee.issueDate,
+      displayRef: ref ? `#${ref}` : '',
+      displayDescription: displayDesc,
+      amount: amount,
+      isDebit: true,
+      isCredit: false,
+      lineDetails: []
+    });
+  }
+  return result;
+}
+
+// ================================================================
+// 8. COLLECT + SORT for one party
+// ================================================================
+const TYPE_PRIORITY = {
+  'Invoice': 1, 'Purchase Invoice': 1,
+  'Credit Note': 2, 'Debit Note': 2,
+  'Late Fee': 3,
+  'Receipt': 4,
+  'Payment': 5,
+  'Journal Entry': 6
+};
+
+function collectAllTransactions(partyKey, idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey) {
+  const cfg = MODES[mode];
+  const partyCur = currencyFor(partyKey);
+  const dp = partyCur.decimals === undefined ? 2 : partyCur.decimals;
+  const itemMap = refs.itemMap;
+
+  let allTransactions = [
+    ...extractReceipts(forParty(idx.receipts, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap),
+    ...extractPayments(forParty(idx.payments, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap),
+    ...extractInvoiceLines(forParty(idx.invoices, partyKey), partyKey, mode, refs.itemMap, refs.accountMap, refs.taxCodeMap, dp),
+    ...extractCreditNotes(forParty(idx.creditNotes, partyKey), partyKey, mode, refs.itemMap, refs.accountMap, refs.taxCodeMap, dp),
+    ...extractJournalEntries(forParty(idx.journals, partyKey), partyKey, mode, refs.accountMap, invoiceMap, dp, baseCurKey),
+  ];
+
+  if (mode === 'customer') {
+    allTransactions = allTransactions.concat(
+      extractLatePaymentFees(forParty(idx.fees, partyKey), partyKey, invoiceMap, dp)
+    );
+  }
+
+  for (const t of allTransactions) {
+    if (t.date) t.date = dateOnly(t.date);
+  }
+
+  const hasUndated = allTransactions.some(t => !t.date);
+  if (hasUndated) warnings.undated = true;
+
+  allTransactions.sort((a, b) => {
+    if (a.date < b.date) return -1;
+    if (a.date > b.date) return 1;
+
+    if (a.transactionKey && b.transactionKey) {
+      const aBase = a.transactionKey.replace('-wht', '');
+      const bBase = b.transactionKey.replace('-wht', '');
+      if (aBase === bBase && a.transactionKey !== b.transactionKey) {
+        return a.transactionKey.endsWith('-wht') ? 1 : -1;
+      }
+    }
+
+    const aPriority = TYPE_PRIORITY[a.type] || (a.type === 'Withholding Tax' ? 1.5 : 99);
+    const bPriority = TYPE_PRIORITY[b.type] || (b.type === 'Withholding Tax' ? 1.5 : 99);
+    if (aPriority !== bPriority) return aPriority - bPriority;
+
+    if (a.timestamp && b.timestamp && a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+    return (a.reference || '').localeCompare(b.reference || '');
+  });
+
+  const allDates = [...new Set(allTransactions.filter(t => t.date).map(t => t.date))];
+
+  return { allTransactions, allDates };
+}
+
+// ================================================================
+// 9. COMPUTE DISPLAY ROWS
+// ================================================================
+function computeRows(allTransactions, fromDate, toDate, dp) {
+  let openingBalance = 0;
+  const transactionsInRange = [];
+  for (const t of allTransactions) {
+    if (!t.date) continue;
+    if (t.date < fromDate) {
+      openingBalance = roundToCurrencyDp(openingBalance + t.amount, dp);
+    } else if (t.date >= fromDate && t.date <= toDate) {
+      transactionsInRange.push(t);
+    }
+  }
+
+  const rows = [];
+  rows.push({ type: 'balanceForward', amount: openingBalance, runningBalance: openingBalance });
+
+  if (transactionsInRange.length === 0) {
+    rows.push({ type: 'empty' });
+  }
+
+  let balance = openingBalance;
+  for (const t of transactionsInRange) {
+    balance = roundToCurrencyDp(balance + t.amount, dp);
+    rows.push({ type: 'main', transaction: t, runningBalance: balance });
+    if (t.lineDetails && t.lineDetails.length > 0) {
+      let lineNum = 1;
+      for (const det of t.lineDetails) {
+        const num = det.noNumber ? null : lineNum++;
+        rows.push({ type: 'detail', detail: det, parent: t, runningBalance: null, lineNumber: num });
+      }
+    }
+  }
+  if (transactionsInRange.length > 0) {
+    let totalDebits = 0, totalCredits = 0;
+    for (const t of transactionsInRange) {
+      if (t.isDebit) totalDebits = roundToCurrencyDp(totalDebits + t.amount, dp);
+      if (t.isCredit) totalCredits = roundToCurrencyDp(totalCredits + Math.abs(t.amount), dp);
+    }
+    rows.push({ type: 'total', debits: totalDebits, credits: totalCredits, runningBalance: balance });
+  }
+
+  return { rows, transactions: transactionsInRange, openingBalance };
+}
+
+// ================================================================
+// 10. RENDER STATEMENT (returns HTML string)
+// ================================================================
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function buildStatementHTML(displayRows, transactions, openingBalance, party, fromDate, toDate, warnings, mode, businessDetails) {
+  if (!party) {
+    return `<div class="statement-page"><div class="empty-state">No party selected.</div></div>`;
+  }
+  const cur = currencyFor(party.key);
+  const cfg = MODES[mode];
+  const partyLabel = cfg.label;
+
+  let lastBalance = openingBalance;
+  for (const row of displayRows) {
+    if (row.type === 'main') lastBalance = row.runningBalance;
+  }
+
+  const partyName = party.nameWithCode || party.name;
+  const address = mode === 'customer' ? party.billingAddress : party.address;
+
+  let warningHtml = '';
+  if (warnings.undated || warnings.controlDegraded || warnings.zeroLineDocs || warnings.currencyMismatch) {
+    warningHtml = `<div class="warning-banner"><strong>⚠️ Data note:</strong>`;
+    if (warnings.undated) warningHtml += ` Some transactions have no date and were omitted.`;
+    if (warnings.controlDegraded) warningHtml += ` <strong>No control accounts found.</strong> Some receipts/payments may be missing.`;
+    if (warnings.zeroLineDocs) warningHtml += ` One or more invoices/credit notes had no lines; their amount was defaulted to 0 — please check them in Manager directly.`;
+    if (warnings.currencyMismatch) warningHtml += ` <strong>Multi‑currency note:</strong> Exchange rate was missing for some transactions; amount may be approximated.`;
+    warningHtml += `</div>`;
+  }
+
+  const bizName = businessDetails ? (businessDetails.name || '') : '';
+  const bizAddress = businessDetails ? (businessDetails.address || '') : '';
+
+  const headerHtml = `
+    <div class="doc-title">
+      <div class="doc-meta">
+        <div class="doc-meta-title">Statement</div>
+        <div class="doc-meta-sub">Currency: ${cur.code}</div>
+        <div class="doc-meta-generated">Generated: <strong>${formatDate(todayStr())}</strong></div>
+      </div>
+      <div class="biz-block">
+        ${bizName ? `<div class="biz-name">${escapeHtml(bizName)}</div>` : ''}
+        ${bizAddress ? `<div class="biz-address">${escapeHtml(bizAddress)}</div>` : ''}
+      </div>
+    </div>
+    <div class="party-block">
+      <div>
+        <div class="label">${partyLabel}</div>
+        <div class="name">${escapeHtml(partyName)}</div>
+        ${address ? `<div class="address">${escapeHtml(address)}</div>` : ''}
+      </div>
+      <div class="range">
+        <div class="label">Statement Period</div>
+        <div class="name" style="font-size:.9rem;">${formatDate(fromDate)} &ndash; ${formatDate(toDate)}</div>
+      </div>
+    </div>
+    ${warningHtml}
+  `;
+
+  const printHeaderText = `${escapeHtml(partyName)} — ${formatDate(fromDate)} to ${formatDate(toDate)}`;
+
+  let tableHtml = `<div class="table-wrap"><table>
+    <thead>
+      <tr class="print-header-row">
+        <td colspan="5">${printHeaderText}</td>
+      </tr>
+      <tr>
+        <th>Date</th>
+        <th>Transaction</th>
+        <th class="num">Debit</th>
+        <th class="num">Credit</th>
+        <th class="num">Balance</th>
+      </tr>
+    </thead><tbody>`;
+
+  for (const row of displayRows) {
+    if (row.type === 'balanceForward') {
+      tableHtml += `<tr class="tr-balance-forward">
+        <td>${formatDate(fromDate)}</td>
+        <td>Balance Forward</td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num">${formatBalanceWithDrCrFor(row.runningBalance, cur)}</td>
+      </tr>`;
+    } else if (row.type === 'empty') {
+      tableHtml += `<tr class="tr-empty"><td colspan="5">No transactions posted in this period.</td></tr>`;
+    } else if (row.type === 'main') {
+      const t = row.transaction;
+      // Journal Entry: no badge — show description directly (line desc → narration → "Journal Entry").
+      // Other types: badge shows displayType (custom title) or type, then description after em-dash.
+      let transDesc;
+      if (t.type === 'Journal Entry') {
+        const jeText = t.displayDescription || 'Journal Entry';
+        transDesc = (t.displayRef ? `${t.displayRef} &mdash; ` : '') + escapeHtml(jeText);
+      } else {
+        const badgeLabel = t.displayType || t.type;
+        const badge = `<span class="badge">${escapeHtml(badgeLabel)}</span>`;
+        transDesc = badge;
+        if (t.displayRef) transDesc += ` ${t.displayRef}`;
+        if (t.displayDescription) transDesc += ` &mdash; ${escapeHtml(t.displayDescription)}`;
+      }
+      const debitStr = t.isDebit ? formatFixed(Math.abs(t.amount), cur.decimals) : '';
+      const creditStr = t.isCredit ? formatFixed(Math.abs(t.amount), cur.decimals) : '';
+      tableHtml += `<tr class="tr-main">
+        <td>${formatDate(t.date)}</td>
+        <td>${transDesc}</td>
+        <td class="num">${debitStr}</td>
+        <td class="num">${creditStr}</td>
+        <td class="num">${formatBalanceWithDrCrFor(row.runningBalance, cur)}</td>
+      </tr>`;
+    } else if (row.type === 'detail') {
+      const d = row.detail;
+      const total = d.total;
+      const absTotal = Math.abs(total);
+      const isNegative = total < 0;
+
+      let parts = [];
+      let desc = d.description ? escapeHtml(d.description) : '';
+      if (isNegative && desc) {
+        desc = `Less: ${desc}`;
+      } else if (isNegative && !desc) {
+        desc = 'Less: Amount';
+      }
+      if (desc) parts.push(desc);
+
+      if (d.qty !== null && d.qty !== 0) {
+        let qtyStr = formatNumberDp(Math.abs(d.qty), cur.decimals);
+        if (d.unitName) qtyStr += ` ${d.unitName}`;
+        if (d.price > 0) qtyStr += ` @ ${formatMoneyFor(d.price, cur)}`;
+        parts.push(qtyStr);
+      }
+      if (d.discountText) parts.push(d.discountText);
+
+      if (d.taxDisplay) {
+        parts.push(`<strong>Amt. excl. Tax=${formatSignedFor(d.baseAmount, cur)}</strong>`);
+        parts.push(d.taxDisplay);
+        if (isNegative) {
+          parts.push(`<strong>${formatMoneyFor(absTotal, cur)}</strong>`);
+        } else {
+          parts.push(`<strong>Amt. incl. Tax=${formatSignedFor(total, cur)}</strong>`);
+        }
+      } else {
+        if (isNegative) {
+          parts.push(`<strong>${formatMoneyFor(absTotal, cur)}</strong>`);
+        } else {
+          parts.push(`<strong>Amt.=${formatSignedFor(total, cur)}</strong>`);
+        }
+      }
+
+      const detailText = parts.join(' — ');
+      const prefix = row.lineNumber ? `${row.lineNumber}) ` : '';
+      tableHtml += `<tr class="tr-detail">
+        <td></td>
+        <td class="desc">${prefix}${detailText}</td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+      </tr>`;
+    } else if (row.type === 'total') {
+      tableHtml += `<tr class="tr-total">
+        <td></td><td>Period Totals</td>
+        <td class="num">${formatFixed(row.debits, cur.decimals)}</td>
+        <td class="num">${formatFixed(row.credits, cur.decimals)}</td>
+        <td class="num">${formatBalanceWithDrCrFor(row.runningBalance, cur)}</td>
+      </tr>`;
+    }
+  }
+  tableHtml += `</tbody></table></div>`;
+
+  const summary = {};
+  for (const t of transactions) summary[t.type] = (summary[t.type] || 0) + t.amount;
+  for (const key in summary) summary[key] = roundToCurrencyDp(summary[key], cur.decimals);
+
+  const typeLabels = {
+    'Invoice': 'Invoices',
+    'Purchase Invoice': 'Purchase Invoices',
+    'Credit Note': 'Credit Notes',
+    'Debit Note': 'Debit Notes',
+    'Withholding Tax': 'Withholding Tax',
+    'Late Fee': 'Late Payment Fees',
+    'Receipt': 'Receipts',
+    'Payment': 'Payments',
+    'Journal Entry': 'Journal Entries'
+  };
+
+  const summaryItems = [`<span class="item"><strong>Opening:</strong> <strong>${formatBalanceWithDrCrFor(openingBalance, cur)}</strong></span>`];
+  for (const key of Object.keys(typeLabels)) {
+    const val = summary[key];
+    if (val && val !== 0) {
+      summaryItems.push(`<span class="item"><strong>${typeLabels[key]}:</strong> <strong>${formatBalanceWithDrCrFor(val, cur)}</strong></span>`);
+    }
+  }
+  const summaryHtml = `<div class="summary-line">${summaryItems.join(' ')}</div>`;
+  const closingHtml = `<div class="closing-line"><strong>Closing Balance: ${formatBalanceWithDrCrFor(lastBalance, cur)}</strong></div>`;
+
+  return `<div class="statement-page">${headerHtml + tableHtml + summaryHtml + closingHtml}</div>`;
+}
+// ================================================================
+// 11. CSV EXPORT (for single statement only)
+// ================================================================
+function exportCSV(displayRows, fromDate, toDate, cur) {
+  if (!displayRows || displayRows.length === 0) return;
+  const headers = ['Date', 'Transaction', 'Debit', 'Credit', 'Balance'];
+  const rows = [];
+  let pending = null;
+
+  function flush() {
+    if (pending) {
+      rows.push([pending.date, pending.lines.join('\n'), pending.debit, pending.credit, pending.balance]);
+      pending = null;
+    }
+  }
+
+  for (const row of displayRows) {
+    if (row.type === 'balanceForward') {
+      flush();
+      rows.push([formatDate(fromDate), 'Balance Forward', '', '', formatBalanceWithDrCrFor(row.runningBalance, cur)]);
+    } else if (row.type === 'empty') {
+      flush();
+      rows.push(['', 'No transactions posted in this period.', '', '', '']);
+    } else if (row.type === 'main') {
+      flush();
+      const t = row.transaction;
+      let desc = t.displayType || t.type;
+      if (t.displayRef) desc += ' ' + t.displayRef;
+      if (t.displayDescription) desc += ' - ' + t.displayDescription;
+      pending = {
+        date: formatDate(t.date),
+        lines: [desc],
+        debit: t.isDebit ? formatFixed(Math.abs(t.amount), cur.decimals) : '',
+        credit: t.isCredit ? formatFixed(Math.abs(t.amount), cur.decimals) : '',
+        balance: formatBalanceWithDrCrFor(row.runningBalance, cur)
+      };
+    } else if (row.type === 'detail') {
+      const d = row.detail;
+      const parts = [];
+      if (d.description) parts.push(d.description);
+      if (d.qty !== null && d.qty !== 0) {
+        let qtyStr = formatNumberDp(d.qty, cur.decimals);
+        if (d.unitName) qtyStr += ` ${d.unitName}`;
+        if (d.price > 0) qtyStr += ` @ ${formatMoneyFor(d.price, cur)}`;
+        parts.push(qtyStr);
+      }
+      if (d.discountText) parts.push(d.discountText);
+      if (d.taxDisplay) {
+        parts.push(`Amt. excl. Tax=${formatSignedFor(d.baseAmount, cur)}`);
+        parts.push(d.taxDisplay);
+        parts.push(`Amt. incl. Tax=${formatSignedFor(d.total, cur)}`);
+      } else {
+        parts.push(`Amt.=${formatSignedFor(d.total, cur)}`);
+      }
+      const prefix = row.lineNumber ? row.lineNumber + ') ' : '';
+      if (pending) pending.lines.push(prefix + parts.join(' - '));
+    } else if (row.type === 'total') {
+      flush();
+      rows.push(['', 'Period Totals', formatFixed(row.debits, cur.decimals), formatFixed(row.credits, cur.decimals), formatBalanceWithDrCrFor(row.runningBalance, cur)]);
+    }
+  }
+  flush();
+
+  const csvEscape = (v) => `"${String(v).replace(/"/g, '""')}"`;
+  let csv = headers.map(csvEscape).join(',') + '\n' + rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentMode}_statement_${fromDate}_to_${toDate}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ================================================================
+// 12. DATE RANGE PRESETS
+// ================================================================
+function localDateStr(year, month, day) {
+  return `${String(year).padStart(4,'0')}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+function startOfMonthsAgo(today, monthsBack) {
+  let year = today.getFullYear();
+  let month = today.getMonth() - (monthsBack - 1);
+  while (month < 0) { month += 12; year -= 1; }
+  return localDateStr(year, month, 1);
+}
+function todayStr() {
+  const now = new Date();
+  return localDateStr(now.getFullYear(), now.getMonth(), now.getDate());
+}
+function lastDayOfMonth(year, month) {
+  // month is 0-based; new Date(year, month+1, 0) gives last day of that month
+  const d = new Date(year, month + 1, 0);
+  return localDateStr(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function computePresetRange(preset) {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth(); // 0-based
+  const to = todayStr();
+  let from = to;
+  let toOverride = null;
+
+  switch (preset) {
+    // Current periods — from start of period to today
+    case 'this-month':
+      from = localDateStr(y, m, 1);
+      break;
+    case 'this-quarter': {
+      const qStart = Math.floor(m / 3) * 3;
+      from = localDateStr(y, qStart, 1);
+      break;
+    }
+    case 'this-year':
+      from = localDateStr(y, 0, 1);
+      break;
+
+    // Last complete periods — full calendar period, both from and to fixed
+    case 'last-month': {
+      const lm = m === 0 ? 11 : m - 1;
+      const ly = m === 0 ? y - 1 : y;
+      from = localDateStr(ly, lm, 1);
+      toOverride = lastDayOfMonth(ly, lm);
+      break;
+    }
+    case 'last-quarter': {
+      const curQ = Math.floor(m / 3);
+      const lq = curQ === 0 ? 3 : curQ - 1;
+      const lqy = curQ === 0 ? y - 1 : y;
+      from = localDateStr(lqy, lq * 3, 1);
+      toOverride = lastDayOfMonth(lqy, lq * 3 + 2);
+      break;
+    }
+    case 'last-year':
+      from = localDateStr(y - 1, 0, 1);
+      toOverride = localDateStr(y - 1, 11, 31);
+      break;
+
+    // Rolling — from start of month N months ago to today
+    case 'last-3-months':
+      from = startOfMonthsAgo(today, 3);
+      break;
+    case 'last-6-months':
+      from = startOfMonthsAgo(today, 6);
+      break;
+    case 'last-12-months':
+      from = startOfMonthsAgo(today, 12);
+      break;
+
+    default:
+      from = null;
+  }
+  return { from, to: toOverride || to };
+}
+function applyPreset(preset) {
+  if (preset === 'custom') return;
+  if (preset === 'from-start') {
+    document.getElementById('toDate').value = todayStr();
+    document.getElementById('fromDate').value = todayStr(); // placeholder; overwritten after data loads
+    runActiveView();
+    return;
+  }
+  const { from, to } = computePresetRange(preset);
+  if (from) {
+    document.getElementById('fromDate').value = from;
+    document.getElementById('toDate').value = to;
+    runActiveView();
+  }
+}
+
+// ================================================================
+// 13. VIEW SWITCHING
+// ================================================================
+function showDashboard() {
+  activePartyKey = '';
+  isBatchMode = false;
+  document.getElementById('partySelect').value = '';
+  document.getElementById('backToDashboard').style.display = 'none';
+  document.getElementById('printBtn').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('generateBatchBtn').style.display = 'none';
+  document.getElementById('printDashboardBtn').style.display = '';
+  document.getElementById('dashboardView').style.display = '';
+  document.getElementById('statementView').style.display = 'none';
+  document.title = 'Statements (Customer / Supplier)';
+}
+function showStatement(partyKey, batchMode = false) {
+  activePartyKey = partyKey;
+  isBatchMode = batchMode;
+  document.getElementById('partySelect').value = partyKey;
+  document.getElementById('backToDashboard').style.display = '';
+  document.getElementById('printDashboardBtn').style.display = 'none';
+  if (batchMode) {
+    document.getElementById('printBtn').style.display = '';
+    document.getElementById('exportBtn').style.display = 'none';
+    document.getElementById('generateBatchBtn').style.display = 'none';
+  } else {
+    document.getElementById('printBtn').style.display = '';
+    document.getElementById('exportBtn').style.display = '';
+    document.getElementById('generateBatchBtn').style.display = 'none';
+  }
+  document.getElementById('dashboardView').style.display = 'none';
+  document.getElementById('statementView').style.display = '';
+}
+function runActiveView() {
+  if (activePartyKey && !isBatchMode) generateStatement(activePartyKey);
+  else renderDashboardView();
+}
+
+// ================================================================
+// 14. DATA LOADING (cached)
+// ================================================================
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+let referenceDataCache = null;
+async function getReferenceData(mode) {
+  const now = Date.now();
+  if (referenceDataCache && referenceDataCache.mode === mode && (now - referenceDataCache.ts) < CACHE_TTL_MS) return referenceDataCache.data;
+
+  const [inventoryItems, nonInventoryItems, inventoryKits,
+    balanceSheetAccounts, profitAndLossAccounts, taxCodes,
+    mainControlAccount, controlAccounts, bankAccounts, exchangeRates,
+    businessDetails] = await Promise.all([
+      getInventoryItems(), getNonInventoryItems(), getInventoryKits(),
+      getBalanceSheetAccounts(), getProfitAndLossAccounts(), getTaxCodes(),
+      getMainControlAccount(mode), getControlAccountsBatch(mode),
+      getBankOrCashAccounts(), getExchangeRates(),
+      safeFetch('business details', () => postMessageWithResponse({ type: 'api-request', method: 'GET', path: '/api4/business-details' }), null)
+    ]);
+
+  const bankMap = {};
+  for (const entry of bankAccounts) {
+    const acc = entry.item || entry;
+    if (acc.key) {
+      bankMap[acc.key] = acc.currency || null;
+    }
+  }
+
+  const controlAccountKeys = [];
+  if (mainControlAccount && mainControlAccount.key) {
+    controlAccountKeys.push(mainControlAccount.key);
+  }
+  const flag = MODES[mode].controlAccountFlag;
+  for (const entry of controlAccounts) {
+    const ac = entry.item || entry;
+    if (ac[flag] === true && ac.key) {
+      controlAccountKeys.push(ac.key);
+    }
+  }
+  const uniqueKeys = [...new Set(controlAccountKeys)];
+
+  const rateMap = buildExchangeRateMap(exchangeRates);
+
+  const data = {
+    itemMap: buildItemMap(inventoryItems, nonInventoryItems, inventoryKits),
+    accountMap: buildAccountMap(balanceSheetAccounts, profitAndLossAccounts),
+    taxCodeMap: buildTaxCodeMap(taxCodes),
+    controlAccountKeys: uniqueKeys,
+    controlDegraded: uniqueKeys.length === 0,
+    bankCurrencyMap: bankMap,
+    exchangeRateMap: rateMap,
+    businessDetails: businessDetails || null
+  };
+  referenceDataCache = { mode, data, ts: Date.now() };
+  return data;
+}
+
+let transactionalDataCache = null;
+async function getTransactionalData(mode) {
+  const now = Date.now();
+  if (transactionalDataCache && transactionalDataCache.mode === mode && (now - transactionalDataCache.ts) < CACHE_TTL_MS) return transactionalDataCache.data;
+
+  const [receipts, payments, invoices, creditNotes, journals, fees, allInvoicesForMap] = await Promise.all([
+    getReceipts(), getPayments(),
+    getInvoices(mode), getCreditNotes(mode),
+    getJournalEntries(),
+    MODES[mode].includeLateFees ? getLatePaymentFees() : Promise.resolve([]),
+    getAllInvoices()
+  ]);
+
+  const refs = await getReferenceData(mode);
+  const cfg = MODES[mode];
+  const headerField = cfg.headerPartyField;
+  const linePartyField = cfg.linePartyField;
+  const payeeValue = cfg.payeeValue;
+
+  const idx = {
+    receipts: indexCashDocsByParty(receipts, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
+    payments: indexCashDocsByParty(payments, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
+    invoices: indexByTopLevelParty(invoices, headerField),
+    creditNotes: indexByTopLevelParty(creditNotes, headerField),
+    journals: indexJournalsByParty(journals, linePartyField),
+    fees: indexByTopLevelParty(fees, headerField)
+  };
+
+  const invoiceMap = buildInvoiceMap(allInvoicesForMap);
+  const data = { idx, invoiceMap, refs };
+  transactionalDataCache = { mode, data, ts: Date.now() };
+  return data;
+}
+
+function invalidateAllCaches() {
+  referenceDataCache = null;
+  transactionalDataCache = null;
+  currencyCache = {};
+  currencyInfoByUuid = {};
+  baseCurrencyInfo = null;
+  exchangeRateMap = {};
+  bankCurrencyMap = {};
+}
+
+// ================================================================
+// 15. DASHBOARD RENDERING (with batch mode toggle)
+// ================================================================
+let dashboardSort = { col: 'code', dir: 1 };
+let dashboardRowsCache = [];
+let dashboardByCurrencyCache = {};
+let dashboardCurrentColumns = [];
+
+async function renderDashboardView() {
+  const loader = document.getElementById('loader');
+  document.getElementById('errorMsg').style.display = 'none';
+  const errorDiv = document.getElementById('errorMsg');
+  const content = document.getElementById('dashboardContent');
+  loader.style.display = 'block';
+  errorDiv.style.display = 'none';
+
+  try {
+    const fromDate = document.getElementById('fromDate').value;
+    const toDate = document.getElementById('toDate').value;
+    if (!fromDate || !toDate) { showError('Please select both dates.'); loader.style.display = 'none'; return; }
+
+    await fetchDateFormat();
+    const mode = currentMode;
+    const cfg = MODES[mode];
+    const td = await getTransactionalData(mode);
+    const refs = td.refs;
+    const invoiceMap = td.invoiceMap;
+    const bankCurrencyMap = refs.bankCurrencyMap;
+    const rateMap = refs.exchangeRateMap;
+    exchangeRateMap = rateMap;
+    await ensureBaseCurrency();
+    const baseCurKey = baseCurrencyInfo.key;
+    await ensureBankCurrencies(bankCurrencyMap);
+    await ensureCurrencyForParties(allParties.map(p => p.key));
+
+    warnings = { undated: false, controlDegraded: refs.controlDegraded, zeroLineDocs: false, currencyMismatch: false };
+
+    // Build per-party summary rows
+    const summaryRows = [];
+    const byCurrency = {};
+
+    for (const party of allParties) {
+      const cur = currencyFor(party.key);
+      const curKey = cur.key || cur.code;
+      if (!byCurrency[curKey]) {
+        byCurrency[curKey] = { symbol: cur.symbol, code: cur.code, decimals: cur.decimals, invCount: 0, invTotal: 0, cnCount: 0, cnTotal: 0, recvCount: 0, recvTotal: 0, payCount: 0, payTotal: 0, outstandingDr: 0, outstandingCr: 0 };
+      }
+      const agg = byCurrency[curKey];
+
+      const { allTransactions } = collectAllTransactions(party.key, td.idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey);
+      const { transactions, openingBalance } = computeRows(allTransactions, fromDate, toDate, cur.decimals);
+
+      let balance = openingBalance;
+      const totals = {
+        Invoice: 0,
+        CreditNote: 0,
+        Receipt: 0,
+        Payment: 0,
+        JournalEntry: 0,
+        LateFee: 0,
+        WithholdingTax: 0
+      };
+
+      for (const t of transactions) {
+        const amount = t.amount;
+        if (t.type === 'Invoice' || t.type === 'Purchase Invoice') {
+          totals.Invoice += amount;
+          agg.invCount++;
+          agg.invTotal = roundToCurrencyDp(agg.invTotal + Math.abs(amount), cur.decimals);
+        } else if (t.type === 'Credit Note' || t.type === 'Debit Note') {
+          totals.CreditNote += amount;
+          agg.cnCount++;
+          agg.cnTotal = roundToCurrencyDp(agg.cnTotal + Math.abs(amount), cur.decimals);
+        } else if (t.type === 'Receipt') {
+          totals.Receipt += amount;
+          agg.recvCount++;
+          agg.recvTotal = roundToCurrencyDp(agg.recvTotal + Math.abs(amount), cur.decimals);
+        } else if (t.type === 'Payment') {
+          totals.Payment += amount;
+          agg.payCount++;
+          agg.payTotal = roundToCurrencyDp(agg.payTotal + Math.abs(amount), cur.decimals);
+        } else if (t.type === 'Journal Entry') {
+          totals.JournalEntry += amount;
+        } else if (t.type === 'Late Fee') {
+          totals.LateFee += amount;
+        } else if (t.type === 'Withholding Tax') {
+          totals.WithholdingTax += amount;
+        }
+        balance = roundToCurrencyDp(balance + amount, cur.decimals);
+      }
+
+      // Accumulate outstanding totals without rounding (keep raw)
+      if (balance > 0) agg.outstandingDr = agg.outstandingDr + balance;
+      else if (balance < 0) agg.outstandingCr = agg.outstandingCr + Math.abs(balance);
+
+      if (transactions.length === 0 && openingBalance === 0 && balance === 0) continue;
+
+      summaryRows.push({
+        key: party.key,
+        code: party.code || '',
+        name: party.nameWithCode || party.name || 'Unnamed',
+        openingBalance: openingBalance,
+        closingBalance: balance,
+        totals: totals,
+        cur: cur
+      });
+    }
+
+    // Determine which columns to show (only those with any non-zero total across all rows)
+    const typeFields = ['Invoice', 'CreditNote', 'Receipt', 'Payment', 'JournalEntry', 'LateFee', 'WithholdingTax'];
+    if (mode === 'supplier') {
+      const idx = typeFields.indexOf('LateFee');
+      if (idx !== -1) typeFields.splice(idx, 1);
+    }
+    const activeColumns = typeFields.filter(field => {
+      return summaryRows.some(row => row.totals[field] !== 0);
+    });
+
+    dashboardRowsCache = summaryRows;
+    dashboardByCurrencyCache = byCurrency;
+    dashboardCurrentColumns = activeColumns;
+    const hideZero = document.getElementById('hideZeroToggle')?.checked;
+    const visibleRows = hideZero ? summaryRows.filter(r => r.closingBalance !== 0) : summaryRows;
+    renderDashboardBody(content, byCurrency, visibleRows, mode, activeColumns);
+  } catch (err) {
+    showError(`Error: ${err.message || 'Unknown error'}`);
+    console.error(err);
+  } finally {
+    loader.style.display = 'none';
+  }
+}
+
+function joinByCurrency(byCurrency, field, countField, separator = ' · ') {
+  const parts = [];
+  let anyCount = 0;
+  for (const key in byCurrency) {
+    const agg = byCurrency[key];
+    if (countField && agg[countField] === 0) continue;
+    anyCount += countField ? agg[countField] : 0;
+    const amount = formatNumberDp(agg[field], agg.decimals);
+    parts.push(`${agg.code || key} ${amount}`);
+  }
+  return { text: parts.length ? parts.join(separator) : (countField ? `${agg0Symbol(byCurrency)}0` : '—'), count: anyCount };
+}
+function agg0Symbol(byCurrency) {
+  const first = Object.values(byCurrency)[0];
+  return first ? first.symbol : '$';
+}
+
+function buildDashboardCardsHtml(byCurrency, mode) {
+  const cfg = MODES[mode];
+  const inv = joinByCurrency(byCurrency, 'invTotal', 'invCount', '<br>');
+  const cn = joinByCurrency(byCurrency, 'cnTotal', 'cnCount', '<br>');
+  const recv = joinByCurrency(byCurrency, 'recvTotal', 'recvCount', '<br>');
+  const pay = joinByCurrency(byCurrency, 'payTotal', 'payCount', '<br>');
+  let primaryTotal, secondaryTotal, primaryLabel, secondaryLabel;
+  if (mode === 'customer') {
+    primaryTotal = joinByCurrency(byCurrency, 'outstandingDr', null, '<br>');
+    secondaryTotal = joinByCurrency(byCurrency, 'outstandingCr', null, '<br>');
+    primaryLabel = cfg.outstandingLabel;
+    secondaryLabel = cfg.creditLabel;
+  } else {
+    primaryTotal = joinByCurrency(byCurrency, 'outstandingCr', null, '<br>');
+    secondaryTotal = joinByCurrency(byCurrency, 'outstandingDr', null, '<br>');
+    primaryLabel = cfg.outstandingLabel;
+    secondaryLabel = cfg.creditLabel;
+  }
+
+  return `
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">${mode === 'customer' ? 'Invoices' : 'Purchase Invoices'}</div>
+        <div class="card-value">${inv.text}</div>
+        <div class="card-sub">${inv.count} in period</div>
+      </div>
+      <div class="card">
+        <div class="card-label">${mode === 'customer' ? 'Credit Notes' : 'Debit Notes'}</div>
+        <div class="card-value">${cn.text}</div>
+        <div class="card-sub">${cn.count} in period</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Receipts</div>
+        <div class="card-value">${recv.text}</div>
+        <div class="card-sub">${recv.count} in period</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Payments</div>
+        <div class="card-value">${pay.text}</div>
+        <div class="card-sub">${pay.count} in period</div>
+      </div>
+      <div class="card">
+        <div class="card-label">${primaryLabel}</div>
+        <div class="card-value">${primaryTotal.text}</div>
+        <div class="card-sub">${secondaryTotal.text !== '—' ? `${secondaryLabel}: ${secondaryTotal.text}` : 'as of ' + formatDate(document.getElementById('toDate').value)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function sortDashboardRows(rows, col, dir) {
+  return [...rows].sort((a, b) => {
+    let av, bv;
+    if (col === 'code') { av = a.code || ''; bv = b.code || ''; }
+    else if (col === 'name') { av = a.name || ''; bv = b.name || ''; }
+    else if (col === 'openingBalance' || col === 'closingBalance') {
+      av = a[col];
+      bv = b[col];
+    } else {
+      av = a.totals[col] || 0;
+      bv = b.totals[col] || 0;
+    }
+    if (typeof av === 'number' && typeof bv === 'number') {
+      return dir * (av - bv);
+    }
+    const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0) return dir * cmp;
+    return String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true }) ||
+           String(a.name || '').localeCompare(String(b.name || ''));
+  });
+}
+
+function buildDashboardTableHtml(rows, mode, activeColumns, batchMode) {
+  const sorted = sortDashboardRows(rows, dashboardSort.col, dashboardSort.dir);
+  const arrow = (col) => dashboardSort.col === col ? (dashboardSort.dir === 1 ? ' <span class="sort-arrow">&#9650;</span>' : ' <span class="sort-arrow">&#9660;</span>') : '';
+
+  const cfg = MODES[mode];
+  const colLabels = {
+    Invoice: mode === 'supplier' ? 'Purchase Invoices' : 'Invoices',
+    CreditNote: mode === 'supplier' ? 'Debit Notes' : 'Credit Notes',
+    Receipt: 'Receipts',
+    Payment: 'Payments',
+    JournalEntry: 'Journal Entries',
+    LateFee: 'Late Fees',
+    WithholdingTax: 'Withholding Tax'
+  };
+  let headerHtml = `<tr>`;
+  if (batchMode) {
+    headerHtml += `<th><input type="checkbox" id="selectAllCheckbox" /></th>`;
+  }
+  headerHtml += `
+    <th data-sort="code">Code${arrow('code')}</th>
+    <th data-sort="name">${cfg.label}${arrow('name')}</th>
+    <th data-sort="openingBalance" class="num">Opening${arrow('openingBalance')}</th>`;
+  for (const col of activeColumns) {
+    const label = colLabels[col] || col;
+    headerHtml += `<th data-sort="${col}" class="num">${label}${arrow(col)}</th>`;
+  }
+  headerHtml += `<th data-sort="closingBalance" class="num">Closing Balance${arrow('closingBalance')}</th></tr>`;
+
+  let bodyHtml = '';
+  if (sorted.length === 0) {
+    const colSpan = 4 + activeColumns.length + (batchMode ? 1 : 0);
+    bodyHtml += `<tr><td colspan="${colSpan}" style="text-align:center;color:var(--muted);padding:20px;">No parties with activity or an outstanding balance in this period.</td></tr>`;
+  } else {
+    for (const r of sorted) {
+      const bal = r.closingBalance;
+      let balCls;
+      if (mode === 'customer') {
+        balCls = bal > 0 ? 'bal-dr' : (bal < 0 ? 'bal-cr' : 'bal-zero');
+      } else {
+        balCls = bal > 0 ? 'bal-cr' : (bal < 0 ? 'bal-dr' : 'bal-zero');
+      }
+      let rowHtml = `<tr data-party="${escapeHtml(r.key)}">`;
+      if (batchMode) {
+        rowHtml += `<td><input type="checkbox" class="party-checkbox" data-party="${escapeHtml(r.key)}" /></td>`;
+      }
+      rowHtml += `
+        <td>${r.code ? `<span class="code-chip">${escapeHtml(r.code)}</span>` : ''}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td class="num">${formatBalanceWithDrCrFor(r.openingBalance, r.cur)}</td>`;
+      for (const col of activeColumns) {
+        const amount = r.totals[col] || 0;
+        rowHtml += `<td class="num">${formatBalanceWithDrCrFor(amount, r.cur)}</td>`;
+      }
+      rowHtml += `<td class="num ${balCls}">${formatBalanceWithDrCrFor(bal, r.cur)}</td></tr>`;
+      bodyHtml += rowHtml;
+    }
+  }
+
+  return `<div class="dash-table-wrap"><table class="dash-table">
+    <thead>${headerHtml}</thead>
+    <tbody>${bodyHtml}</tbody>
+  </table></div>`;
+}
+
+function renderDashboardBody(container, byCurrency, rows, mode, activeColumns) {
+  const batchMode = document.getElementById('batchModeToggle').checked;
+  const cardsHtml = buildDashboardCardsHtml(byCurrency, mode);
+  const tableHtml = buildDashboardTableHtml(rows, mode, activeColumns, batchMode);
+  container.innerHTML = cardsHtml + tableHtml;
+
+  // Show/hide Generate Selected button
+  const generateBtn = document.getElementById('generateBatchBtn');
+  generateBtn.style.display = batchMode ? '' : 'none';
+
+  // Set up checkboxes if in batch mode
+  const selectAll = document.getElementById('selectAllCheckbox');
+  const checkboxes = container.querySelectorAll('.party-checkbox');
+  if (selectAll) {
+    selectAll.addEventListener('change', function() {
+      checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+    // Ensure select all reflects current state
+    selectAll.checked = checkboxes.length > 0 && Array.from(checkboxes).every(c => c.checked);
+  }
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', function() {
+      if (selectAll) {
+        selectAll.checked = Array.from(checkboxes).every(c => c.checked);
+      }
+    });
+  });
+
+  // Sorting
+  container.querySelectorAll('thead th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (dashboardSort.col === col) dashboardSort.dir *= -1;
+      else { dashboardSort.col = col; dashboardSort.dir = 1; }
+      renderDashboardBody(container, byCurrency, dashboardRowsCache, mode, activeColumns);
+    });
+  });
+
+  // Row click: if batch mode, toggle checkbox; else open statement
+  container.querySelectorAll('tbody tr[data-party]').forEach(tr => {
+    tr.addEventListener('click', function(e) {
+      if (e.target.type === 'checkbox') return;
+      if (batchMode) {
+        const cb = this.querySelector('.party-checkbox');
+        if (cb) cb.checked = !cb.checked;
+        if (selectAll) {
+          const allCbs = container.querySelectorAll('.party-checkbox');
+          selectAll.checked = Array.from(allCbs).every(c => c.checked);
+        }
+      } else {
+        const partyKey = this.dataset.party;
+        if (partyKey) {
+          showStatement(partyKey, false);
+          generateStatement(partyKey);
+        }
+      }
+    });
+  });
+}
+
+// ================================================================
+// 16. SINGLE & BATCH STATEMENT GENERATION
+// ================================================================
+let currentGeneration = 0;
+
+async function generateStatement(partyKey) {
+  document.getElementById('errorMsg').style.display = 'none';
+  const myGeneration = ++currentGeneration;
+  let fromDate = document.getElementById('fromDate').value;
+  let toDate = document.getElementById('toDate').value;
+
+  if (!partyKey) { showError('Please select a party.'); return; }
+  if (!fromDate || !toDate) { showError('Please select both dates.'); return; }
+
+  const btn = document.getElementById('fetchBtn');
+  const loader = document.getElementById('loader');
+  const errorDiv = document.getElementById('errorMsg');
+  const content = document.getElementById('statementContent');
+
+  btn.disabled = true;
+  loader.style.display = 'block';
+  errorDiv.style.display = 'none';
+  content.innerHTML = '';
+
+  try {
+    await fetchDateFormat();
+    const mode = currentMode;
+    const td = await getTransactionalData(mode);
+    const refs = td.refs;
+    const invoiceMap = td.invoiceMap;
+    const bankCurrencyMap = refs.bankCurrencyMap;
+    const rateMap = refs.exchangeRateMap;
+    exchangeRateMap = rateMap;
+    await ensureBaseCurrency();
+    const baseCurKey = baseCurrencyInfo.key;
+    // Ensure party currency info is fetched
+    await ensureCurrencyForParties([partyKey]);
+    // Ensure bank account currencies are fetched
+    const bankCurUuids = new Set();
+    for (const bankKey in bankCurrencyMap) {
+      const curKey = bankCurrencyMap[bankKey];
+      if (curKey) bankCurUuids.add(curKey);
+    }
+    const missingBank = [...bankCurUuids].filter(u => !currencyInfoByUuid[u]);
+    if (missingBank.length > 0) {
+      const fetched = await getForeignCurrenciesByKeys(missingBank);
+      for (const it of fetched) {
+        const c = it.item || it;
+        if (c.key) {
+          currencyInfoByUuid[c.key] = {
+            symbol: c.prefix || c.displayPrefix || '$',
+            decimals: (c.decimalPlaces !== undefined && c.decimalPlaces !== null) ? c.decimalPlaces : 2,
+            code: c.code || c.displayCode || 'USD',
+            key: c.key
+          };
+        }
+      }
+    }
+
+    warnings = { undated: false, controlDegraded: refs.controlDegraded, zeroLineDocs: false, currencyMismatch: false };
+
+    if (myGeneration !== currentGeneration) return;
+
+    const { allTransactions, allDates } = collectAllTransactions(partyKey, td.idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey);
+
+    if (document.getElementById('rangePreset').value === 'from-start') {
+      const earliest = allDates.length > 0 ? allDates.reduce((a, b) => (a < b ? a : b)) : fromDate;
+      fromDate = earliest;
+      document.getElementById('fromDate').value = earliest;
+    }
+
+    const cur = currencyFor(partyKey);
+    const { rows, transactions, openingBalance } = computeRows(allTransactions, fromDate, toDate, cur.decimals);
+
+    if (myGeneration !== currentGeneration) return;
+
+    currentDisplayRows = rows;
+    currentRange = { from: fromDate, to: toDate };
+
+    const party = allParties.find(p => p.key === partyKey);
+    const html = buildStatementHTML(rows, transactions, openingBalance, party, fromDate, toDate, warnings, mode, refs.businessDetails);
+    content.innerHTML = html;
+
+    // Set print title to "Statement - PartyName"
+    const partyName = party ? (party.nameWithCode || party.name || '') : '';
+    document.title = partyName ? `Statement - ${partyName}` : 'Statement of Account';
+
+    showStatement(partyKey, false);
+  } catch (err) {
+    if (myGeneration !== currentGeneration) return;
+    showError(`Error: ${err.message || 'Unknown error'}`);
+    console.error(err);
+  } finally {
+    if (myGeneration !== currentGeneration) return;
+    btn.disabled = false;
+    loader.style.display = 'none';
+  }
+}
+
+async function generateBatchStatements(partyKeys) {
+  if (!partyKeys || partyKeys.length === 0) {
+    showError('Please select at least one party.');
+    return;
+  }
+
+  const btn = document.getElementById('generateBatchBtn');
+  const loader = document.getElementById('loader');
+  const errorDiv = document.getElementById('errorMsg');
+  const content = document.getElementById('statementContent');
+
+  btn.disabled = true;
+  loader.style.display = 'block';
+  errorDiv.style.display = 'none';
+  content.innerHTML = '';
+  const myBatchGen = ++currentGeneration;
+
+  try {
+    await fetchDateFormat();
+    const mode = currentMode;
+    if (myBatchGen !== currentGeneration) return;
+    const td = await getTransactionalData(mode);
+    const refs = td.refs;
+    const invoiceMap = td.invoiceMap;
+    const bankCurrencyMap = refs.bankCurrencyMap;
+    const rateMap = refs.exchangeRateMap;
+    exchangeRateMap = rateMap;
+    await ensureBaseCurrency();
+    const baseCurKey = baseCurrencyInfo.key;
+    await ensureCurrencyForParties(partyKeys);
+    await ensureBankCurrencies(bankCurrencyMap);
+
+    const globalFromDate = document.getElementById('fromDate').value;
+    const globalToDate = document.getElementById('toDate').value;
+    let fromDate = globalFromDate;
+    let toDate = globalToDate;
+
+    let combinedHTML = '';
+
+    for (const partyKey of partyKeys) {
+      const party = allParties.find(p => p.key === partyKey);
+      if (!party) continue;
+
+      warnings = { undated: false, controlDegraded: refs.controlDegraded, zeroLineDocs: false, currencyMismatch: false };
+
+      const { allTransactions, allDates } = collectAllTransactions(partyKey, td.idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey);
+
+      let localFromDate = fromDate;
+      if (document.getElementById('rangePreset').value === 'from-start') {
+        const earliest = allDates.length > 0 ? allDates.reduce((a, b) => (a < b ? a : b)) : fromDate;
+        localFromDate = earliest;
+      }
+
+      const cur = currencyFor(partyKey);
+      const { rows, transactions, openingBalance } = computeRows(allTransactions, localFromDate, toDate, cur.decimals);
+
+      const html = buildStatementHTML(rows, transactions, openingBalance, party, localFromDate, toDate, warnings, mode, refs.businessDetails);
+      combinedHTML += html;
+    }
+
+    content.innerHTML = combinedHTML;
+    showStatement('', true);
+  } catch (err) {
+    showError(`Error: ${err.message || 'Unknown error'}`);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    loader.style.display = 'none';
+  }
+}
+
+function showError(msg) {
+  const errorDiv = document.getElementById('errorMsg');
+  errorDiv.textContent = msg;
+  errorDiv.style.display = 'block';
+}
+
+// ================================================================
+// 17. MAIN CONTROLLER / EVENTS
+// ================================================================
+async function loadParties(mode) {
+  try {
+    allParties = [];
+    const select = document.getElementById('partySelect');
+    select.innerHTML = `<option value="">— Loading… —</option>`;
+    const items = await getParties(mode);
+    allParties = items.map(entry => entry.item || entry).filter(p => p.key);
+    select.innerHTML = `<option value="">— All ${MODES[mode].label}s —</option>`;
+    const sorted = [...allParties].sort((a, b) =>
+      String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true }) ||
+      String(a.name || '').localeCompare(String(b.name || ''))
+    );
+    for (const p of sorted) {
+      const opt = document.createElement('option');
+      opt.value = p.key;
+      opt.textContent = p.nameWithCode || p.name || p.code || 'Unnamed';
+      select.appendChild(opt);
+    }
+  } catch (err) {
+    showError(`Failed to load ${MODES[mode].label}s.`);
+    console.error(err);
+  }
+}
+
+async function fetchDateFormat() {
+  try {
+    const resp = await getDateFormat();
+    if (resp && resp.dateFormat) dateFormatStr = resp.dateFormat;
+  } catch (e) {
+    console.warn('Failed to fetch date format, using default dd/MM/yyyy.', e);
+  }
+}
+
+// ---- Batch mode toggle ----
+document.getElementById('batchModeToggle').addEventListener('change', function() {
+  renderDashboardView();
+});
+document.getElementById('hideZeroToggle').addEventListener('change', function() {
+  if (dashboardRowsCache.length > 0) {
+    const content = document.getElementById('dashboardContent');
+    const mode = currentMode;
+    const activeColumns = dashboardCurrentColumns;
+    const hideZero = this.checked;
+    const visibleRows = hideZero ? dashboardRowsCache.filter(r => r.closingBalance !== 0) : dashboardRowsCache;
+    renderDashboardBody(content, dashboardByCurrencyCache, visibleRows, mode, activeColumns);
+  }
+});
+
+// ---- Mode change ----
+document.getElementById('modeSelect').addEventListener('change', async function () {
+  currentMode = this.value;
+  invalidateAllCaches();
+  await loadParties(currentMode);
+  showDashboard();
+  renderDashboardView();
+});
+
+// ---- Date presets ----
+document.getElementById('rangePreset').addEventListener('change', function () {
+  applyPreset(this.value);
+});
+document.getElementById('fromDate').addEventListener('change', () => {
+  document.getElementById('rangePreset').value = 'custom';
+});
+document.getElementById('toDate').addEventListener('change', () => {
+  document.getElementById('rangePreset').value = 'custom';
+});
+
+// ---- Party dropdown ----
+document.getElementById('partySelect').addEventListener('change', function () {
+  if (this.value) {
+    showStatement(this.value, false);
+    generateStatement(this.value);
+  } else {
+    showDashboard();
+    renderDashboardView();
+  }
+});
+
+// ---- Dashboard / Batch ----
+document.getElementById('backToDashboard').addEventListener('click', () => {
+  showDashboard();
+  renderDashboardView();
+});
+
+document.getElementById('fetchBtn').addEventListener('click', () => {
+  const selected = document.getElementById('partySelect').value;
+  if (selected) {
+    showStatement(selected, false);
+    generateStatement(selected);
+  } else {
+    showError('Please select a party from the dropdown.');
+  }
+});
+
+document.getElementById('generateBatchBtn').addEventListener('click', () => {
+  const selectedCheckboxes = document.querySelectorAll('.party-checkbox:checked');
+  const partyKeys = Array.from(selectedCheckboxes).map(cb => cb.dataset.party);
+  generateBatchStatements(partyKeys);
+});
+
+// ---- Print & Export ----
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+document.getElementById('printDashboardBtn').addEventListener('click', () => {
+  const statementView = document.getElementById('statementView');
+  const dashboardView = document.getElementById('dashboardView');
+  const controls = document.querySelector('.controls');
+  controls.style.display = 'none';
+  if (statementView.style.display !== 'none') {
+    statementView.style.display = 'none';
+    dashboardView.style.display = '';
+  }
+  window.print();
+  setTimeout(() => {
+    controls.style.display = '';
+    if (activePartyKey && !isBatchMode) {
+      statementView.style.display = '';
+      dashboardView.style.display = 'none';
+    } else if (isBatchMode) {
+      statementView.style.display = '';
+      dashboardView.style.display = 'none';
+    } else {
+      statementView.style.display = 'none';
+      dashboardView.style.display = '';
+    }
+  }, 100);
+});
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!currentDisplayRows || currentDisplayRows.length === 0 || !activePartyKey) {
+    showError('No data to export. Generate a statement first.');
+  } else {
+    exportCSV(currentDisplayRows, currentRange.from, currentRange.to, currencyFor(activePartyKey));
+  }
+});
+
+// ---- Refresh ----
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+  invalidateAllCaches();
+  await loadParties(currentMode);
+  runActiveView();
+});
+
+// ---- Date inputs ----
+document.querySelectorAll('input[type="date"]').forEach(el => {
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') runActiveView(); });
+});
+
+// ---- Initial load ----
+document.addEventListener('DOMContentLoaded', async () => {
+  const { from, to } = computePresetRange('last-3-months');
+  document.getElementById('fromDate').value = from;
+  document.getElementById('toDate').value = to;
+  document.getElementById('rangePreset').value = 'last-3-months';
+
+  currentMode = document.getElementById('modeSelect').value;
+  await loadParties(currentMode);
+  showDashboard();
+  renderDashboardView();
+});
+</script>
+</body>
+</html>
