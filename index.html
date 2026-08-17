@@ -387,6 +387,58 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
 .loader{display:none;text-align:center;padding:24px;color:#9aa0a6;font-size:.84rem;letter-spacing:.02em;}
 .empty-state{padding:40px;text-align:center;color:#9aa0a6;font-size:.88rem;}
 
+/* ---- Combined Statement Modal ---- */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;
+  animation:fadeIn .15s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 8px 40px rgba(0,0,0,.18);
+  width:520px;max-width:95vw;
+  overflow:hidden;
+  animation:slideUp .18s ease;
+}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px 14px;
+  border-bottom:1px solid #e9ecef;
+}
+.modal-title{font-size:.95rem;font-weight:700;color:var(--ink);}
+.modal-close{background:none;border:none;font-size:1.3rem;line-height:1;color:#9aa0a6;cursor:pointer;padding:0 2px;}
+.modal-close:hover{color:var(--ink);}
+.modal-body{padding:20px;}
+.modal-hint{font-size:.78rem;color:#6c757d;margin-bottom:16px;line-height:1.5;}
+.modal-row{display:flex;gap:14px;align-items:flex-start;}
+.modal-field{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
+.modal-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6c757d;}
+.modal-select{width:100%;padding:7px 10px;border:1px solid #ced4da;border-radius:6px;font-size:.84rem;font-family:inherit;color:var(--ink);background:#fff;outline:none;transition:border-color .15s;}
+.modal-select:focus{border-color:var(--accent);}
+.modal-error{margin-top:12px;padding:8px 12px;background:#f8d7da;border:1px solid #f5c2c7;border-radius:6px;font-size:.78rem;color:#842029;}
+.modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #e9ecef;background:#f8f9fa;}
+.btn-primary{background:var(--accent);color:#fff;border:none;padding:7px 18px;border-radius:6px;font-weight:600;font-size:.82rem;cursor:pointer;transition:filter .15s;}
+.btn-primary:hover{filter:brightness(1.1);}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;}
+.modal-cancel{color:#6c757d;}
+
+/* ---- Combined statement party block ---- */
+.party-block-combined{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid var(--line);margin-bottom:14px;}
+.party-block-combined > div{padding:8px 12px 10px;}
+.party-block-combined > div:not(:last-child){border-right:1px solid #e9ecef;}
+.combined-badge{display:inline-block;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:3px;margin-bottom:4px;}
+.combined-badge.customer{background:#e8f4fd;color:#1a6fa8;}
+.combined-badge.supplier{background:#fef3e2;color:#b45309;}
+
+/* badge colour variants for combined */
+.badge.badge-sale{background:#1a6fa8;}
+.badge.badge-purchase{background:#b45309;}
+
 /* ---- Print styles ---- */
 @media print{
   body{background:#fff;padding:0;}
@@ -496,6 +548,7 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
       <button id="printBtn" class="btn-secondary" style="display:none;">&#128438; Print</button>
       <button id="printDashboardBtn" class="btn-secondary">&#128438; Print</button>
       <button id="exportBtn" class="btn-secondary" style="display:none;">&#8659; CSV</button>
+      <button id="combinedBtn" class="btn-secondary">&#9783; Combined</button>
       <button id="refreshBtn" class="btn-secondary" title="Refetch everything from Manager">&#8635; Refresh</button>
     </div>
     <div class="controls-group">
@@ -515,6 +568,38 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
 
   <div id="statementView" style="display:none;">
     <div class="statement-body" id="statementContent"></div>
+  </div>
+</div>
+
+<!-- Combined Statement Modal -->
+<div id="combinedModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Combined Statement</span>
+      <button class="modal-close" id="combinedModalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-hint">Select one customer and one supplier to generate a combined net statement. Both parties must share the same currency.</p>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label class="modal-label">Customer</label>
+          <select id="combinedCustomerSelect" class="modal-select">
+            <option value="">— Select Customer —</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Supplier</label>
+          <select id="combinedSupplierSelect" class="modal-select">
+            <option value="">— Select Supplier —</option>
+          </select>
+        </div>
+      </div>
+      <div id="combinedModalError" class="modal-error" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary modal-cancel" id="combinedModalCancel">Cancel</button>
+      <button class="btn-primary" id="combinedModalGenerate">Generate Combined Statement</button>
+    </div>
   </div>
 </div>
 
@@ -699,6 +784,8 @@ let warnings = { undated: false, controlDegraded: false, zeroLineDocs: false, cu
 let activePartyKey = '';
 let currentMode = 'customer';
 let isBatchMode = false;
+let isCombinedMode = false;
+let combinedKeys = { customerKey: null, supplierKey: null };
 
 let currencyCache = {}; // partyKey -> currency object
 let currencyInfoByUuid = {}; // currencyKey -> currency object (including base)
@@ -1948,9 +2035,10 @@ function computeRows(allTransactions, fromDate, toDate, dp) {
   const transactionsInRange = [];
   for (const t of allTransactions) {
     if (!t.date) continue;
-    if (t.date < fromDate) {
+    const d = dateOnly(t.date);
+    if (d < fromDate) {
       openingBalance = roundToCurrencyDp(openingBalance + t.amount, dp);
-    } else if (t.date >= fromDate && t.date <= toDate) {
+    } else if (d >= fromDate && d <= toDate) {
       transactionsInRange.push(t);
     }
   }
@@ -2365,6 +2453,8 @@ function applyPreset(preset) {
 function showDashboard() {
   activePartyKey = '';
   isBatchMode = false;
+  isCombinedMode = false;
+  combinedKeys = { customerKey: null, supplierKey: null };
   document.getElementById('partySelect').value = '';
   document.getElementById('backToDashboard').style.display = 'none';
   document.getElementById('printBtn').style.display = 'none';
@@ -2387,15 +2477,20 @@ function showStatement(partyKey, batchMode = false) {
     document.getElementById('generateBatchBtn').style.display = 'none';
   } else {
     document.getElementById('printBtn').style.display = '';
-    document.getElementById('exportBtn').style.display = '';
+    document.getElementById('exportBtn').style.display = isCombinedMode ? 'none' : '';
     document.getElementById('generateBatchBtn').style.display = 'none';
   }
   document.getElementById('dashboardView').style.display = 'none';
   document.getElementById('statementView').style.display = '';
 }
 function runActiveView() {
-  if (activePartyKey && !isBatchMode) generateStatement(activePartyKey);
-  else renderDashboardView();
+  if (isCombinedMode && combinedKeys.customerKey && combinedKeys.supplierKey) {
+    generateCombinedStatement(combinedKeys.customerKey, combinedKeys.supplierKey);
+  } else if (activePartyKey && !isBatchMode) {
+    generateStatement(activePartyKey);
+  } else {
+    renderDashboardView();
+  }
 }
 
 // ================================================================
@@ -2403,10 +2498,15 @@ function runActiveView() {
 // ================================================================
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-let referenceDataCache = null;
+const referenceDataCacheByMode = {};
+let referenceDataCache = null; // kept for compatibility
 async function getReferenceData(mode) {
+  return getReferenceDataForMode(mode);
+}
+async function getReferenceDataForMode(mode) {
   const now = Date.now();
-  if (referenceDataCache && referenceDataCache.mode === mode && (now - referenceDataCache.ts) < CACHE_TTL_MS) return referenceDataCache.data;
+  const cached = referenceDataCacheByMode[mode];
+  if (cached && (now - cached.ts) < CACHE_TTL_MS) return cached.data;
 
   const [inventoryItems, nonInventoryItems, inventoryKits,
     balanceSheetAccounts, profitAndLossAccounts, taxCodes,
@@ -2422,24 +2522,17 @@ async function getReferenceData(mode) {
   const bankMap = {};
   for (const entry of bankAccounts) {
     const acc = entry.item || entry;
-    if (acc.key) {
-      bankMap[acc.key] = acc.currency || null;
-    }
+    if (acc.key) bankMap[acc.key] = acc.currency || null;
   }
 
   const controlAccountKeys = [];
-  if (mainControlAccount && mainControlAccount.key) {
-    controlAccountKeys.push(mainControlAccount.key);
-  }
+  if (mainControlAccount && mainControlAccount.key) controlAccountKeys.push(mainControlAccount.key);
   const flag = MODES[mode].controlAccountFlag;
   for (const entry of controlAccounts) {
     const ac = entry.item || entry;
-    if (ac[flag] === true && ac.key) {
-      controlAccountKeys.push(ac.key);
-    }
+    if (ac[flag] === true && ac.key) controlAccountKeys.push(ac.key);
   }
   const uniqueKeys = [...new Set(controlAccountKeys)];
-
   const rateMap = buildExchangeRateMap(exchangeRates);
 
   const data = {
@@ -2452,7 +2545,7 @@ async function getReferenceData(mode) {
     exchangeRateMap: rateMap,
     businessDetails: businessDetails || null
   };
-  referenceDataCache = { mode, data, ts: Date.now() };
+  referenceDataCacheByMode[mode] = { data, ts: Date.now() };
   return data;
 }
 
@@ -2492,7 +2585,11 @@ async function getTransactionalData(mode) {
 
 function invalidateAllCaches() {
   referenceDataCache = null;
+  for (const k in referenceDataCacheByMode) delete referenceDataCacheByMode[k];
   transactionalDataCache = null;
+  for (const k in transactionalDataCacheByMode) delete transactionalDataCacheByMode[k];
+  allCustomers = [];
+  allSuppliers = [];
   currencyCache = {};
   currencyInfoByUuid = {};
   baseCurrencyInfo = null;
@@ -3022,7 +3119,345 @@ function showError(msg) {
 }
 
 // ================================================================
-// 17. MAIN CONTROLLER / EVENTS
+// 17. COMBINED STATEMENT (Customer + Supplier)
+// ================================================================
+let allCustomers = [];
+let allSuppliers = [];
+
+async function populateCombinedModal() {
+  // Always refresh the party lists (may have been cleared by invalidateAllCaches)
+  if (allCustomers.length === 0) {
+    const items = await safeFetch('customers', () => fetchAllPages('/api4/customer-batch'), []);
+    allCustomers = items.map(e => e.item || e).filter(p => p.key && !p.inactive);
+    allCustomers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+  if (allSuppliers.length === 0) {
+    const items = await safeFetch('suppliers', () => fetchAllPages('/api4/supplier-batch'), []);
+    allSuppliers = items.map(e => e.item || e).filter(p => p.key && !p.inactive);
+    allSuppliers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  // Only rebuild dropdowns when the modal is actually open
+  const modalOpen = document.getElementById('combinedModal').style.display !== 'none';
+  if (!modalOpen) return;
+
+  const custSel = document.getElementById('combinedCustomerSelect');
+  const suppSel = document.getElementById('combinedSupplierSelect');
+  custSel.innerHTML = '<option value="">— Select Customer —</option>';
+  suppSel.innerHTML = '<option value="">— Select Supplier —</option>';
+
+  for (const p of allCustomers) {
+    const opt = document.createElement('option');
+    opt.value = p.key;
+    opt.textContent = p.nameWithCode || p.name || p.code || 'Unnamed';
+    custSel.appendChild(opt);
+  }
+  for (const p of allSuppliers) {
+    const opt = document.createElement('option');
+    opt.value = p.key;
+    opt.textContent = p.nameWithCode || p.name || p.code || 'Unnamed';
+    suppSel.appendChild(opt);
+  }
+}
+
+async function generateCombinedStatement(customerKey, supplierKey) {
+  let fromDate = document.getElementById('fromDate').value;
+  const toDate = document.getElementById('toDate').value;
+  if (!fromDate || !toDate) { showError('Please select both dates.'); return; }
+
+  const errDiv = document.getElementById('combinedModalError');
+  const modalOpen = document.getElementById('combinedModal').style.display !== 'none';
+  const showCombinedError = (msg) => {
+    if (modalOpen) { errDiv.textContent = msg; errDiv.style.display = ''; }
+    else showError(msg);
+  };
+  errDiv.style.display = 'none';
+
+  const generateBtn = document.getElementById('combinedModalGenerate');
+  if (generateBtn) { generateBtn.disabled = true; generateBtn.textContent = 'Generating…'; }
+
+  try {
+    await fetchDateFormat();
+    await ensureBaseCurrency();
+
+    // Fetch both modes' transactional data
+    const [custTd, suppTd] = await Promise.all([
+      getTransactionalDataForMode('customer'),
+      getTransactionalDataForMode('supplier')
+    ]);
+
+    // Ensure currency info loaded for both parties before currency check
+    await ensureCurrencyForParties([customerKey, supplierKey]);
+    await ensureBankCurrencies({ ...custTd.refs.bankCurrencyMap, ...suppTd.refs.bankCurrencyMap });
+
+    // Currency check
+    const custCur = currencyFor(customerKey);
+    const suppCur = currencyFor(supplierKey);
+    if (custCur.key !== suppCur.key) {
+      showCombinedError(`Currency mismatch: Customer is ${custCur.code}, Supplier is ${suppCur.code}. Combined statements require matching currencies.`);
+      return;
+    }
+
+    // Ensure party lists are populated (may have been cleared by refresh)
+    await populateCombinedModal();
+    const custParty = allCustomers.find(p => p.key === customerKey);
+    const suppParty = allSuppliers.find(p => p.key === supplierKey);
+    if (!custParty || !suppParty) { showCombinedError('Party not found.'); return; }
+
+    // Set global exchange rate map from both modes merged
+    exchangeRateMap = { ...custTd.refs.exchangeRateMap, ...suppTd.refs.exchangeRateMap };
+
+    // Collect transactions for each party
+    warnings = { undated: false, controlDegraded: false, zeroLineDocs: false, currencyMismatch: false };
+    const baseCurKey = baseCurrencyInfo ? baseCurrencyInfo.key : null;
+    const { allTransactions: custRaw } = collectAllTransactions(customerKey, custTd.idx, 'customer', custTd.refs, custTd.invoiceMap, custTd.refs.bankCurrencyMap, baseCurKey);
+    const { allTransactions: suppRaw } = collectAllTransactions(supplierKey, suppTd.idx, 'supplier', suppTd.refs, suppTd.invoiceMap, suppTd.refs.bankCurrencyMap, baseCurKey);
+
+    // Tag source; override displayType for badge disambiguation in combined view
+    for (const t of custRaw) {
+      t._source = 'customer';
+      if (t.type === 'Invoice') t.displayType = 'Sale Invoice';
+    }
+    for (const t of suppRaw) {
+      t._source = 'supplier';
+      if (t.type === 'Purchase Invoice') t.displayType = 'Purchase Invoice';
+      if (t.type === 'Debit Note') t.displayType = 'Debit Note';
+    }
+
+    const allTransactions = [...custRaw, ...suppRaw];
+    const dp = custCur.decimals === undefined ? 2 : custCur.decimals;
+
+    // Sort merged list by date → type priority → timestamp → ref
+    allTransactions.sort((a, b) => {
+      const da = a.date || '';
+      const db = b.date || '';
+      if (da !== db) return da.localeCompare(db);
+      const ap = TYPE_PRIORITY[a.type] || 99;
+      const bp = TYPE_PRIORITY[b.type] || 99;
+      if (ap !== bp) return ap - bp;
+      if (a.timestamp && b.timestamp && a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+      return (a.reference || '').localeCompare(b.reference || '');
+    });
+
+    // Handle from-start: find earliest transaction date across both parties
+    if (document.getElementById('rangePreset').value === 'from-start') {
+      const allDates = [...new Set(allTransactions.filter(t => t.date).map(t => dateOnly(t.date)))];
+      const earliest = allDates.length > 0 ? allDates.reduce((a, b) => (a < b ? a : b)) : fromDate;
+      fromDate = earliest;
+      document.getElementById('fromDate').value = earliest;
+    }
+
+    // computeRows handles opening balance and period filtering internally
+    const { rows, transactions: periodTransactions, openingBalance } = computeRows(allTransactions, fromDate, toDate, dp);
+
+    // Close modal if open, show statement
+    if (modalOpen) document.getElementById('combinedModal').style.display = 'none';
+
+    const content = document.getElementById('statementContent');
+    const html = buildCombinedStatementHTML(rows, periodTransactions, openingBalance, custParty, suppParty, fromDate, toDate, warnings, custCur, custTd.refs.businessDetails);
+    content.innerHTML = html;
+
+    currentDisplayRows = rows;
+    currentRange = { from: fromDate, to: toDate };
+    isCombinedMode = true;
+    combinedKeys = { customerKey, supplierKey };
+    document.title = `Combined Statement - ${custParty.name} / ${suppParty.name}`;
+
+    showStatement('__combined__', false);
+    document.getElementById('exportBtn').style.display = 'none'; // CSV not supported for combined
+
+  } catch (err) {
+    showCombinedError(`Error: ${err.message || 'Unknown error'}`);
+    console.error(err);
+  } finally {
+    if (generateBtn) { generateBtn.disabled = false; generateBtn.textContent = 'Generate Combined Statement'; }
+  }
+}
+
+const transactionalDataCacheByMode = {};
+
+async function getTransactionalDataForMode(mode) {
+  const now = Date.now();
+  const cached = transactionalDataCacheByMode[mode];
+  if (cached && (now - cached.ts) < CACHE_TTL_MS) return cached.data;
+
+  const [receipts, payments, invoices, creditNotes, journals, fees, allInvoicesForMap] = await Promise.all([
+    safeFetch('receipts', () => fetchAllPages('/api4/receipt-batch'), []),
+    safeFetch('payments', () => fetchAllPages('/api4/payment-batch'), []),
+    getInvoices(mode), getCreditNotes(mode),
+    safeFetch('journal entries', () => fetchAllPages('/api4/journal-entry-batch'), []),
+    MODES[mode].includeLateFees ? getLatePaymentFees() : Promise.resolve([]),
+    getAllInvoices()
+  ]);
+
+  const refs = await getReferenceDataForMode(mode);
+  const cfg = MODES[mode];
+  const headerField = cfg.headerPartyField;
+  const linePartyField = cfg.linePartyField;
+  const payeeValue = cfg.payeeValue;
+
+  const idx = {
+    receipts: indexCashDocsByParty(receipts, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
+    payments: indexCashDocsByParty(payments, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
+    invoices: indexByTopLevelParty(invoices, headerField),
+    creditNotes: indexByTopLevelParty(creditNotes, headerField),
+    journals: indexJournalsByParty(journals, linePartyField),
+    fees: indexByTopLevelParty(fees, headerField)
+  };
+
+  const invoiceMap = buildInvoiceMap(allInvoicesForMap);
+  const data = { idx, invoiceMap, refs };
+  transactionalDataCacheByMode[mode] = { data, ts: Date.now() };
+  return data;
+}
+
+function buildCombinedStatementHTML(displayRows, transactions, openingBalance, custParty, suppParty, fromDate, toDate, warnings, cur, businessDetails) {
+  const dp = cur.decimals === undefined ? 2 : cur.decimals;
+  const custName = custParty.nameWithCode || custParty.name;
+  const suppName = suppParty.nameWithCode || suppParty.name;
+  const bizName = businessDetails ? (businessDetails.name || '') : '';
+  const bizAddress = businessDetails ? (businessDetails.address || '') : '';
+
+  let lastBalance = openingBalance;
+  for (const row of displayRows) if (row.type === 'main') lastBalance = row.runningBalance;
+
+  let warningHtml = '';
+  if (warnings.undated || warnings.zeroLineDocs || warnings.currencyMismatch) {
+    warningHtml = `<div class="warning-banner"><strong>⚠️ Data note:</strong>`;
+    if (warnings.undated) warningHtml += ` Some transactions have no date and were omitted.`;
+    if (warnings.zeroLineDocs) warningHtml += ` One or more documents had no lines; amount defaulted to 0.`;
+    if (warnings.currencyMismatch) warningHtml += ` Exchange rate missing for some transactions; amount may be approximated.`;
+    warningHtml += `</div>`;
+  }
+
+  const headerHtml = `
+    <div class="doc-title">
+      <div class="doc-meta">
+        <div class="doc-meta-title">Combined Statement</div>
+        <div class="doc-meta-sub">Currency: ${cur.code}</div>
+        <div class="doc-meta-generated">Generated: <strong>${formatDate(todayStr())}</strong></div>
+      </div>
+      <div class="biz-block">
+        ${bizName ? `<div class="biz-name">${escapeHtml(bizName)}</div>` : ''}
+        ${bizAddress ? `<div class="biz-address">${escapeHtml(bizAddress)}</div>` : ''}
+      </div>
+    </div>
+    <div class="party-block-combined">
+      <div>
+        <div class="combined-badge customer">Customer</div>
+        <div class="name">${escapeHtml(custName)}</div>
+        ${custParty.billingAddress || custParty.address ? `<div class="address">${escapeHtml(custParty.billingAddress || custParty.address)}</div>` : ''}
+      </div>
+      <div>
+        <div class="combined-badge supplier">Supplier</div>
+        <div class="name">${escapeHtml(suppName)}</div>
+        ${suppParty.address ? `<div class="address">${escapeHtml(suppParty.address)}</div>` : ''}
+      </div>
+      <div style="text-align:right;">
+        <div class="label">Statement Period</div>
+        <div class="name" style="font-size:.9rem;">${formatDate(fromDate)} &ndash; ${formatDate(toDate)}</div>
+      </div>
+    </div>
+    ${warningHtml}
+  `;
+
+  const printHeaderText = `${escapeHtml(custName)} / ${escapeHtml(suppName)} — ${formatDate(fromDate)} to ${formatDate(toDate)}`;
+
+  let tableHtml = `<div class="table-wrap"><table>
+    <thead>
+      <tr class="print-header-row"><td colspan="5">${printHeaderText}</td></tr>
+      <tr>
+        <th>Date</th><th>Transaction</th>
+        <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
+      </tr>
+    </thead><tbody>`;
+
+  for (const row of displayRows) {
+    if (row.type === 'balanceForward') {
+      tableHtml += `<tr class="tr-balance-forward">
+        <td>${formatDate(fromDate)}</td><td>Balance Forward</td>
+        <td class="num"></td><td class="num"></td>
+        <td class="num">${formatBalanceWithDrCrFor(row.runningBalance, cur)}</td>
+      </tr>`;
+    } else if (row.type === 'empty') {
+      tableHtml += `<tr class="tr-empty"><td colspan="5">No transactions in this period.</td></tr>`;
+    } else if (row.type === 'main') {
+      const t = row.transaction;
+      let transDesc;
+      if (t.type === 'Journal Entry') {
+        const jeText = t.displayDescription || 'Journal Entry';
+        transDesc = (t.displayRef ? `${t.displayRef} &mdash; ` : '') + escapeHtml(jeText);
+      } else {
+        const badgeLabel = t.displayType || t.type;
+        const badge = `<span class="badge">${escapeHtml(badgeLabel)}</span>`;
+        transDesc = badge;
+        if (t.displayRef) transDesc += ` ${t.displayRef}`;
+        if (t.displayDescription) transDesc += ` &mdash; ${escapeHtml(t.displayDescription)}`;
+      }
+      const debitStr = t.isDebit ? formatFixed(Math.abs(t.amount), dp) : '';
+      const creditStr = t.isCredit ? formatFixed(Math.abs(t.amount), dp) : '';
+      tableHtml += `<tr class="tr-main">
+        <td>${formatDate(t.date)}</td><td>${transDesc}</td>
+        <td class="num">${debitStr}</td><td class="num">${creditStr}</td>
+        <td class="num">${formatBalanceWithDrCrFor(row.runningBalance, cur)}</td>
+      </tr>`;
+    } else if (row.type === 'detail') {
+      const d = row.detail;
+      const total = d.total;
+      const absTotal = Math.abs(total);
+      const isNegative = total < 0;
+      let parts = [];
+      let desc = d.description ? escapeHtml(d.description) : '';
+      if (isNegative && desc) desc = `Less: ${desc}`;
+      else if (isNegative) desc = 'Less: Amount';
+      if (desc) parts.push(desc);
+      if (d.qty !== null && d.qty !== 0) {
+        let qtyStr = formatNumberDp(Math.abs(d.qty), dp);
+        if (d.unitName) qtyStr += ` ${d.unitName}`;
+        if (d.price > 0) qtyStr += ` @ ${formatMoneyFor(d.price, cur)}`;
+        parts.push(qtyStr);
+      }
+      if (d.discountText) parts.push(d.discountText);
+      if (d.taxDisplay) {
+        parts.push(`<strong>Amt. excl. Tax=${formatSignedFor(d.baseAmount, cur)}</strong>`);
+        parts.push(d.taxDisplay);
+        parts.push(`<strong>Amt. incl. Tax=${formatSignedFor(total, cur)}</strong>`);
+      } else {
+        parts.push(isNegative ? `<strong>${formatMoneyFor(absTotal, cur)}</strong>` : `<strong>Amt.=${formatSignedFor(total, cur)}</strong>`);
+      }
+      const prefix = row.lineNumber ? `${row.lineNumber}) ` : '';
+      tableHtml += `<tr class="tr-detail">
+        <td></td><td class="desc">${prefix}${parts.join(' — ')}</td>
+        <td class="num"></td><td class="num"></td><td class="num"></td>
+      </tr>`;
+    } else if (row.type === 'total') {
+      tableHtml += `<tr class="tr-total">
+        <td></td><td>Period Totals</td>
+        <td class="num">${formatFixed(row.debits, dp)}</td>
+        <td class="num">${formatFixed(row.credits, dp)}</td>
+        <td class="num">${formatBalanceWithDrCrFor(row.runningBalance, cur)}</td>
+      </tr>`;
+    }
+  }
+  tableHtml += `</tbody></table></div>`;
+
+  // Summary
+  const summaryItems = [`<span class="item"><strong>Opening:</strong> <strong>${formatBalanceWithDrCrFor(openingBalance, cur)}</strong></span>`];
+  const typeLabels = { 'Invoice':'Sale Invoices','Purchase Invoice':'Purchase Invoices','Credit Note':'Credit Notes','Debit Note':'Debit Notes','Receipt':'Receipts','Payment':'Payments','Journal Entry':'Journal Entries','Withholding Tax':'Withholding Tax','Late Fee':'Late Fees' };
+  const typeSums = {};
+  for (const t of transactions) { typeSums[t.type] = roundToCurrencyDp((typeSums[t.type] || 0) + t.amount, dp); }
+  for (const [type, label] of Object.entries(typeLabels)) {
+    const val = typeSums[type];
+    if (val && val !== 0) summaryItems.push(`<span class="item"><strong>${label}:</strong> <strong>${formatBalanceWithDrCrFor(val, cur)}</strong></span>`);
+  }
+  const summaryHtml = `<div class="summary-line">${summaryItems.join(' ')}</div>`;
+  const closingHtml = `<div class="closing-line"><strong>Net Closing Balance: ${formatBalanceWithDrCrFor(lastBalance, cur)}</strong></div>`;
+
+  return `<div class="statement-page">${headerHtml}${tableHtml}${summaryHtml}${closingHtml}</div>`;
+}
+
+// ================================================================
+// 18. MAIN CONTROLLER / EVENTS
 // ================================================================
 async function loadParties(mode) {
   try {
@@ -3110,6 +3545,10 @@ document.getElementById('backToDashboard').addEventListener('click', () => {
 });
 
 document.getElementById('fetchBtn').addEventListener('click', () => {
+  if (isCombinedMode && combinedKeys.customerKey && combinedKeys.supplierKey) {
+    generateCombinedStatement(combinedKeys.customerKey, combinedKeys.supplierKey);
+    return;
+  }
   const selected = document.getElementById('partySelect').value;
   if (selected) {
     showStatement(selected, false);
@@ -3182,6 +3621,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadParties(currentMode);
   showDashboard();
   renderDashboardView();
+});
+
+// ---- Combined Statement Modal ----
+document.getElementById('combinedBtn').addEventListener('click', async () => {
+  document.getElementById('combinedModalError').style.display = 'none';
+  document.getElementById('combinedModal').style.display = 'flex';
+  await populateCombinedModal();
+});
+function closeCombinedModal() {
+  document.getElementById('combinedModal').style.display = 'none';
+}
+document.getElementById('combinedModalClose').addEventListener('click', closeCombinedModal);
+document.getElementById('combinedModalCancel').addEventListener('click', closeCombinedModal);
+document.getElementById('combinedModal').addEventListener('click', function(e) {
+  if (e.target === this) closeCombinedModal();
+});
+document.getElementById('combinedModalGenerate').addEventListener('click', async () => {
+  const customerKey = document.getElementById('combinedCustomerSelect').value;
+  const supplierKey = document.getElementById('combinedSupplierSelect').value;
+  const errDiv = document.getElementById('combinedModalError');
+  if (!customerKey || !supplierKey) {
+    errDiv.textContent = 'Please select both a customer and a supplier.';
+    errDiv.style.display = '';
+    return;
+  }
+  await generateCombinedStatement(customerKey, supplierKey);
 });
 </script>
 </body>
