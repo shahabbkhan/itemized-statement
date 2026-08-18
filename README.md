@@ -28,8 +28,8 @@ A detailed, print-ready statement extension for [Manager.io](https://www.manager
 ## How to add this extension in Manager.io
 
 1. Open **Settings**
-2. Click **Extensions**
-3. Click **New Extension**
+2. Click **Custom Buttons**
+3. Click **New Custom Button**
 4. Enter a **Name** (e.g. Itemized Statement)
 5. Set **Source** = `URL`
 6. Paste this into **Endpoint**: `https://shahabbkhan.github.io/itemized-statement/`
