@@ -387,46 +387,6 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
 .loader{display:none;text-align:center;padding:24px;color:#9aa0a6;font-size:.84rem;letter-spacing:.02em;}
 .empty-state{padding:40px;text-align:center;color:#9aa0a6;font-size:.88rem;}
 
-/* ---- Combined Statement Modal ---- */
-.modal-overlay{
-  position:fixed;inset:0;
-  background:rgba(0,0,0,.45);
-  display:flex;align-items:center;justify-content:center;
-  z-index:1000;
-  animation:fadeIn .15s ease;
-}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.modal-box{
-  background:#fff;
-  border-radius:10px;
-  box-shadow:0 8px 40px rgba(0,0,0,.18);
-  width:520px;max-width:95vw;
-  overflow:hidden;
-  animation:slideUp .18s ease;
-}
-@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
-.modal-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:16px 20px 14px;
-  border-bottom:1px solid #e9ecef;
-}
-.modal-title{font-size:.95rem;font-weight:700;color:var(--ink);}
-.modal-close{background:none;border:none;font-size:1.3rem;line-height:1;color:#9aa0a6;cursor:pointer;padding:0 2px;}
-.modal-close:hover{color:var(--ink);}
-.modal-body{padding:20px;}
-.modal-hint{font-size:.78rem;color:#6c757d;margin-bottom:16px;line-height:1.5;}
-.modal-row{display:flex;gap:14px;align-items:flex-start;}
-.modal-field{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
-.modal-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6c757d;}
-.modal-select{width:100%;padding:7px 10px;border:1px solid #ced4da;border-radius:6px;font-size:.84rem;font-family:inherit;color:var(--ink);background:#fff;outline:none;transition:border-color .15s;}
-.modal-select:focus{border-color:var(--accent);}
-.modal-error{margin-top:12px;padding:8px 12px;background:#f8d7da;border:1px solid #f5c2c7;border-radius:6px;font-size:.78rem;color:#842029;}
-.modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #e9ecef;background:#f8f9fa;}
-.btn-primary{background:var(--accent);color:#fff;border:none;padding:7px 18px;border-radius:6px;font-weight:600;font-size:.82rem;cursor:pointer;transition:filter .15s;}
-.btn-primary:hover{filter:brightness(1.1);}
-.btn-primary:disabled{opacity:.45;cursor:not-allowed;}
-.modal-cancel{color:#6c757d;}
-
 /* ---- Combined statement party block ---- */
 .party-block-combined{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-bottom:1px solid var(--line);margin-bottom:14px;}
 .party-block-combined > div{padding:8px 12px 10px;}
@@ -434,10 +394,6 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
 .combined-badge{display:inline-block;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:3px;margin-bottom:4px;}
 .combined-badge.customer{background:#e8f4fd;color:#1a6fa8;}
 .combined-badge.supplier{background:#fef3e2;color:#b45309;}
-
-/* badge colour variants for combined */
-.badge.badge-sale{background:#1a6fa8;}
-.badge.badge-purchase{background:#b45309;}
 
 /* ---- Print styles ---- */
 @media print{
@@ -512,9 +468,16 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
       <select id="modeSelect">
         <option value="customer">Customer</option>
         <option value="supplier">Supplier</option>
+        <option value="combined">Combined</option>
       </select>
-      <label>Party</label>
+      <label id="partyLabel">Party</label>
       <select id="partySelect"><option value="">— All —</option></select>
+    </div>
+    <div class="controls-group" id="combinedPartyRow" style="display:none;">
+      <label>Customer</label>
+      <select id="combinedCustomerSelect"><option value="">— Select Customer —</option></select>
+      <label>Supplier</label>
+      <select id="combinedSupplierSelect"><option value="">— Select Supplier —</option></select>
     </div>
     <div class="controls-group">
       <label>Period</label>
@@ -548,7 +511,6 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
       <button id="printBtn" class="btn-secondary" style="display:none;">&#128438; Print</button>
       <button id="printDashboardBtn" class="btn-secondary">&#128438; Print</button>
       <button id="exportBtn" class="btn-secondary" style="display:none;">&#8659; CSV</button>
-      <button id="combinedBtn" class="btn-secondary">&#9783; Combined</button>
       <button id="refreshBtn" class="btn-secondary" title="Refetch everything from Manager">&#8635; Refresh</button>
     </div>
     <div class="controls-group">
@@ -571,37 +533,6 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
   </div>
 </div>
 
-<!-- Combined Statement Modal -->
-<div id="combinedModal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
-    <div class="modal-header">
-      <span class="modal-title">Combined Statement</span>
-      <button class="modal-close" id="combinedModalClose">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="modal-hint">Select one customer and one supplier to generate a combined net statement. Both parties must share the same currency.</p>
-      <div class="modal-row">
-        <div class="modal-field">
-          <label class="modal-label">Customer</label>
-          <select id="combinedCustomerSelect" class="modal-select">
-            <option value="">— Select Customer —</option>
-          </select>
-        </div>
-        <div class="modal-field">
-          <label class="modal-label">Supplier</label>
-          <select id="combinedSupplierSelect" class="modal-select">
-            <option value="">— Select Supplier —</option>
-          </select>
-        </div>
-      </div>
-      <div id="combinedModalError" class="modal-error" style="display:none;"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary modal-cancel" id="combinedModalCancel">Cancel</button>
-      <button class="btn-primary" id="combinedModalGenerate">Generate Combined Statement</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ================================================================
@@ -688,6 +619,8 @@ async function postMessageWithResponse(message, timeoutMs = 30000) {
   }
 }
 
+const permissionFailures = new Set();
+
 async function fetchAllPages(basePath, pageSize = 200) {
   let allItems = [];
   let skip = 0;
@@ -695,6 +628,9 @@ async function fetchAllPages(basePath, pageSize = 200) {
   while (hasMore) {
     const path = `${basePath}${basePath.includes('?') ? '&' : '?'}Skip=${skip}&PageSize=${pageSize}`;
     const response = await postMessageWithResponse({ type: 'api-request', method: 'GET', path });
+    if (response && (response.error || response.message) && !response.items) {
+      throw new Error(response.error || response.message);
+    }
     const items = (response && response.items) || [];
     allItems = allItems.concat(items);
     if (items.length < pageSize) hasMore = false;
@@ -704,8 +640,13 @@ async function fetchAllPages(basePath, pageSize = 200) {
 }
 
 async function safeFetch(label, fn, fallback = []) {
-  try { return await fn(); }
-  catch (err) { console.warn(`[statements] ${label} failed:`, err); return fallback; }
+  try {
+    return await fn();
+  } catch (err) {
+    console.warn(`[statements] ${label} failed:`, err.message || err);
+    permissionFailures.add(label);
+    return fallback;
+  }
 }
 
 // ================================================================
@@ -713,7 +654,7 @@ async function safeFetch(label, fn, fallback = []) {
 // ================================================================
 async function getParties(mode) {
   const cfg = MODES[mode];
-  return await fetchAllPages(cfg.partyBatch);
+  return await safeFetch('parties', () => fetchAllPages(cfg.partyBatch), []);
 }
 async function getMainControlAccount(mode) {
   const cfg = MODES[mode];
@@ -728,25 +669,23 @@ async function getControlAccountsBatch(mode) {
 }
 async function getInvoices(mode) {
   const cfg = MODES[mode];
-  return await fetchAllPages(cfg.invoiceBatch);
+  return await safeFetch('invoices', () => fetchAllPages(cfg.invoiceBatch), []);
 }
 async function getCreditNotes(mode) {
   const cfg = MODES[mode];
-  return await fetchAllPages(cfg.creditNoteBatch);
+  return await safeFetch('credit notes', () => fetchAllPages(cfg.creditNoteBatch), []);
 }
 async function getAllInvoices() {
-  // Fetch both sales and purchase invoices regardless of mode — needed for cross-type
-  // references on receipt/payment/JE lines (e.g. a receipt line referencing a purchase invoice)
   const [sales, purchase] = await Promise.all([
     safeFetch('sales invoices', () => fetchAllPages('/api4/sales-invoice-batch'), []),
     safeFetch('purchase invoices', () => fetchAllPages('/api4/purchase-invoice-batch'), [])
   ]);
   return [...sales, ...purchase];
 }
-async function getPayments() { return await fetchAllPages('/api4/payment-batch'); }
-async function getReceipts() { return await fetchAllPages('/api4/receipt-batch'); }
-async function getJournalEntries() { return await fetchAllPages('/api4/journal-entry-batch'); }
-async function getLatePaymentFees() { return await fetchAllPages('/api4/late-payment-fee-batch'); }
+async function getPayments() { return await safeFetch('payments', () => fetchAllPages('/api4/payment-batch'), []); }
+async function getReceipts() { return await safeFetch('receipts', () => fetchAllPages('/api4/receipt-batch'), []); }
+async function getJournalEntries() { return await safeFetch('journal entries', () => fetchAllPages('/api4/journal-entry-batch'), []); }
+async function getLatePaymentFees() { return await safeFetch('late payment fees', () => fetchAllPages('/api4/late-payment-fee-batch'), []); }
 async function getBankOrCashAccounts() { return await safeFetch('bank accounts', () => fetchAllPages('/api4/bank-or-cash-account-batch'), []); }
 async function getExchangeRates() { return await safeFetch('exchange rates', () => fetchAllPages('/api4/exchange-rate-batch'), []); }
 
@@ -758,7 +697,10 @@ async function getProfitAndLossAccounts() { return await safeFetch('profit and l
 async function getTaxCodes() { return await safeFetch('tax codes', () => fetchAllPages('/api4/tax-code-batch'), []); }
 
 async function getBaseCurrency() {
-  return await postMessageWithResponse({ type: 'api-request', method: 'GET', path: '/api4/base-currency' });
+  return await safeFetch('base currency', () => postMessageWithResponse({ type: 'api-request', method: 'GET', path: '/api4/base-currency' }), null);
+}
+async function getDateFormat() {
+  return await safeFetch('date format', () => postMessageWithResponse({ type: 'api-request', method: 'GET', path: '/api4/date-and-number-format' }), null);
 }
 async function getForeignCurrenciesByKeys(keys) {
   if (!keys || keys.length === 0) return [];
@@ -935,9 +877,10 @@ function currencyFor(partyKey) {
 
 // ---- Currency decimal helper (now uses currencyInfoByUuid) ----
 function getCurrencyDecimals(currencyKey) {
-  if (!currencyKey) return baseCurrencyInfo.decimals;
+  const baseDp = baseCurrencyInfo ? baseCurrencyInfo.decimals : 2;
+  if (!currencyKey) return baseDp;
   if (currencyInfoByUuid[currencyKey]) return currencyInfoByUuid[currencyKey].decimals;
-  return baseCurrencyInfo.decimals; // fallback
+  return baseDp;
 }
 
 // ---- Exchange rate helpers ----
@@ -2101,12 +2044,17 @@ function buildStatementHTML(displayRows, transactions, openingBalance, party, fr
   const address = mode === 'customer' ? party.billingAddress : party.address;
 
   let warningHtml = '';
-  if (warnings.undated || warnings.controlDegraded || warnings.zeroLineDocs || warnings.currencyMismatch) {
+  const hasWarnings = warnings.undated || warnings.controlDegraded || warnings.zeroLineDocs || warnings.currencyMismatch || permissionFailures.size > 0;
+  if (hasWarnings) {
     warningHtml = `<div class="warning-banner"><strong>⚠️ Data note:</strong>`;
     if (warnings.undated) warningHtml += ` Some transactions have no date and were omitted.`;
     if (warnings.controlDegraded) warningHtml += ` <strong>No control accounts found.</strong> Some receipts/payments may be missing.`;
     if (warnings.zeroLineDocs) warningHtml += ` One or more invoices/credit notes had no lines; their amount was defaulted to 0 — please check them in Manager directly.`;
     if (warnings.currencyMismatch) warningHtml += ` <strong>Multi‑currency note:</strong> Exchange rate was missing for some transactions; amount may be approximated.`;
+    if (permissionFailures.size > 0) {
+      const failed = [...permissionFailures].join(', ');
+      warningHtml += ` <strong>Permission notice:</strong> Some data could not be loaded due to access restrictions (${failed}). This statement may be incomplete.`;
+    }
     warningHtml += `</div>`;
   }
 
@@ -2453,43 +2401,42 @@ function applyPreset(preset) {
 function showDashboard() {
   activePartyKey = '';
   isBatchMode = false;
-  isCombinedMode = false;
-  combinedKeys = { customerKey: null, supplierKey: null };
+  if (!isCombinedMode) {
+    combinedKeys = { customerKey: null, supplierKey: null };
+  }
   document.getElementById('partySelect').value = '';
   document.getElementById('backToDashboard').style.display = 'none';
   document.getElementById('printBtn').style.display = 'none';
   document.getElementById('exportBtn').style.display = 'none';
   document.getElementById('generateBatchBtn').style.display = 'none';
-  document.getElementById('printDashboardBtn').style.display = '';
-  document.getElementById('dashboardView').style.display = '';
+  document.getElementById('printDashboardBtn').style.display = isCombinedMode ? 'none' : '';
+  document.getElementById('dashboardView').style.display = isCombinedMode ? 'none' : '';
   document.getElementById('statementView').style.display = 'none';
   document.title = 'Statements (Customer / Supplier)';
 }
 function showStatement(partyKey, batchMode = false) {
   activePartyKey = partyKey;
   isBatchMode = batchMode;
-  document.getElementById('partySelect').value = partyKey;
-  document.getElementById('backToDashboard').style.display = '';
+  if (!isCombinedMode) document.getElementById('partySelect').value = partyKey;
+  document.getElementById('backToDashboard').style.display = isCombinedMode ? 'none' : '';
   document.getElementById('printDashboardBtn').style.display = 'none';
-  if (batchMode) {
-    document.getElementById('printBtn').style.display = '';
-    document.getElementById('exportBtn').style.display = 'none';
-    document.getElementById('generateBatchBtn').style.display = 'none';
-  } else {
-    document.getElementById('printBtn').style.display = '';
-    document.getElementById('exportBtn').style.display = isCombinedMode ? 'none' : '';
-    document.getElementById('generateBatchBtn').style.display = 'none';
-  }
+  document.getElementById('printBtn').style.display = '';
+  document.getElementById('exportBtn').style.display = batchMode ? 'none' : '';
+  document.getElementById('generateBatchBtn').style.display = 'none';
   document.getElementById('dashboardView').style.display = 'none';
   document.getElementById('statementView').style.display = '';
 }
-function runActiveView() {
-  if (isCombinedMode && combinedKeys.customerKey && combinedKeys.supplierKey) {
-    generateCombinedStatement(combinedKeys.customerKey, combinedKeys.supplierKey);
+async function runActiveView() {
+  if (isCombinedMode) {
+    const customerKey = combinedKeys.customerKey || document.getElementById('combinedCustomerSelect').value;
+    const supplierKey = combinedKeys.supplierKey || document.getElementById('combinedSupplierSelect').value;
+    if (customerKey && supplierKey) {
+      await generateCombinedStatement(customerKey, supplierKey);
+    }
   } else if (activePartyKey && !isBatchMode) {
-    generateStatement(activePartyKey);
+    await generateStatement(activePartyKey);
   } else {
-    renderDashboardView();
+    await renderDashboardView();
   }
 }
 
@@ -2949,6 +2896,7 @@ let currentGeneration = 0;
 
 async function generateStatement(partyKey) {
   document.getElementById('errorMsg').style.display = 'none';
+  permissionFailures.clear();
   const myGeneration = ++currentGeneration;
   let fromDate = document.getElementById('fromDate').value;
   let toDate = document.getElementById('toDate').value;
@@ -3056,6 +3004,7 @@ async function generateBatchStatements(partyKeys) {
   loader.style.display = 'block';
   errorDiv.style.display = 'none';
   content.innerHTML = '';
+  permissionFailures.clear();
   const myBatchGen = ++currentGeneration;
 
   try {
@@ -3125,7 +3074,7 @@ let allCustomers = [];
 let allSuppliers = [];
 
 async function populateCombinedModal() {
-  // Always refresh the party lists (may have been cleared by invalidateAllCaches)
+  // Fetch both party lists if cleared (e.g. after refresh)
   if (allCustomers.length === 0) {
     const items = await safeFetch('customers', () => fetchAllPages('/api4/customer-batch'), []);
     allCustomers = items.map(e => e.item || e).filter(p => p.key && !p.inactive);
@@ -3137,15 +3086,13 @@ async function populateCombinedModal() {
     allSuppliers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
 
-  // Only rebuild dropdowns when the modal is actually open
-  const modalOpen = document.getElementById('combinedModal').style.display !== 'none';
-  if (!modalOpen) return;
-
+  // Rebuild the inline dropdowns in the toolbar
   const custSel = document.getElementById('combinedCustomerSelect');
   const suppSel = document.getElementById('combinedSupplierSelect');
+  const prevCust = custSel.value;
+  const prevSupp = suppSel.value;
   custSel.innerHTML = '<option value="">— Select Customer —</option>';
   suppSel.innerHTML = '<option value="">— Select Supplier —</option>';
-
   for (const p of allCustomers) {
     const opt = document.createElement('option');
     opt.value = p.key;
@@ -3158,6 +3105,9 @@ async function populateCombinedModal() {
     opt.textContent = p.nameWithCode || p.name || p.code || 'Unnamed';
     suppSel.appendChild(opt);
   }
+  // Restore previous selection if still valid
+  if (prevCust) custSel.value = prevCust;
+  if (prevSupp) suppSel.value = prevSupp;
 }
 
 async function generateCombinedStatement(customerKey, supplierKey) {
@@ -3165,16 +3115,10 @@ async function generateCombinedStatement(customerKey, supplierKey) {
   const toDate = document.getElementById('toDate').value;
   if (!fromDate || !toDate) { showError('Please select both dates.'); return; }
 
-  const errDiv = document.getElementById('combinedModalError');
-  const modalOpen = document.getElementById('combinedModal').style.display !== 'none';
-  const showCombinedError = (msg) => {
-    if (modalOpen) { errDiv.textContent = msg; errDiv.style.display = ''; }
-    else showError(msg);
-  };
-  errDiv.style.display = 'none';
+  const showCombinedError = (msg) => showError(msg);
+  permissionFailures.clear();
 
-  const generateBtn = document.getElementById('combinedModalGenerate');
-  if (generateBtn) { generateBtn.disabled = true; generateBtn.textContent = 'Generating…'; }
+
 
   try {
     await fetchDateFormat();
@@ -3250,8 +3194,7 @@ async function generateCombinedStatement(customerKey, supplierKey) {
     // computeRows handles opening balance and period filtering internally
     const { rows, transactions: periodTransactions, openingBalance } = computeRows(allTransactions, fromDate, toDate, dp);
 
-    // Close modal if open, show statement
-    if (modalOpen) document.getElementById('combinedModal').style.display = 'none';
+
 
     const content = document.getElementById('statementContent');
     const html = buildCombinedStatementHTML(rows, periodTransactions, openingBalance, custParty, suppParty, fromDate, toDate, warnings, custCur, custTd.refs.businessDetails);
@@ -3263,14 +3206,13 @@ async function generateCombinedStatement(customerKey, supplierKey) {
     combinedKeys = { customerKey, supplierKey };
     document.title = `Combined Statement - ${custParty.name} / ${suppParty.name}`;
 
-    showStatement('__combined__', false);
-    document.getElementById('exportBtn').style.display = 'none'; // CSV not supported for combined
+    showStatement('', false);
 
   } catch (err) {
     showCombinedError(`Error: ${err.message || 'Unknown error'}`);
     console.error(err);
   } finally {
-    if (generateBtn) { generateBtn.disabled = false; generateBtn.textContent = 'Generate Combined Statement'; }
+    // nothing to restore
   }
 }
 
@@ -3322,11 +3264,16 @@ function buildCombinedStatementHTML(displayRows, transactions, openingBalance, c
   for (const row of displayRows) if (row.type === 'main') lastBalance = row.runningBalance;
 
   let warningHtml = '';
-  if (warnings.undated || warnings.zeroLineDocs || warnings.currencyMismatch) {
+  const hasWarnings = warnings.undated || warnings.zeroLineDocs || warnings.currencyMismatch || permissionFailures.size > 0;
+  if (hasWarnings) {
     warningHtml = `<div class="warning-banner"><strong>⚠️ Data note:</strong>`;
     if (warnings.undated) warningHtml += ` Some transactions have no date and were omitted.`;
     if (warnings.zeroLineDocs) warningHtml += ` One or more documents had no lines; amount defaulted to 0.`;
     if (warnings.currencyMismatch) warningHtml += ` Exchange rate missing for some transactions; amount may be approximated.`;
+    if (permissionFailures.size > 0) {
+      const failed = [...permissionFailures].join(', ');
+      warningHtml += ` <strong>Permission notice:</strong> Some data could not be loaded due to access restrictions (${failed}). This statement may be incomplete.`;
+    }
     warningHtml += `</div>`;
   }
 
@@ -3494,7 +3441,7 @@ async function fetchDateFormat() {
 
 // ---- Batch mode toggle ----
 document.getElementById('batchModeToggle').addEventListener('change', function() {
-  renderDashboardView();
+  if (!isCombinedMode) renderDashboardView();
 });
 document.getElementById('hideZeroToggle').addEventListener('change', function() {
   if (dashboardRowsCache.length > 0) {
@@ -3509,11 +3456,35 @@ document.getElementById('hideZeroToggle').addEventListener('change', function() 
 
 // ---- Mode change ----
 document.getElementById('modeSelect').addEventListener('change', async function () {
-  currentMode = this.value;
-  invalidateAllCaches();
-  await loadParties(currentMode);
-  showDashboard();
-  renderDashboardView();
+  const mode = this.value;
+  if (mode === 'combined') {
+    currentMode = 'customer'; // keep API mode valid
+    isCombinedMode = true;
+    combinedKeys = { customerKey: null, supplierKey: null };
+    document.getElementById('partySelect').value = '';
+    document.getElementById('partyLabel').style.display = 'none';
+    document.getElementById('partySelect').style.display = 'none';
+    document.getElementById('combinedPartyRow').style.display = '';
+    document.getElementById('batchModeToggle').parentElement.style.display = 'none';
+    document.getElementById('hideZeroToggle').parentElement.style.display = 'none';
+    document.getElementById('batchModeToggle').checked = false;
+    invalidateAllCaches();
+    await populateCombinedModal();
+    showDashboard();
+  } else {
+    isCombinedMode = false;
+    combinedKeys = { customerKey: null, supplierKey: null };
+    currentMode = mode;
+    document.getElementById('partyLabel').style.display = '';
+    document.getElementById('partySelect').style.display = '';
+    document.getElementById('combinedPartyRow').style.display = 'none';
+    document.getElementById('batchModeToggle').parentElement.style.display = '';
+    document.getElementById('hideZeroToggle').parentElement.style.display = '';
+    invalidateAllCaches();
+    await loadParties(currentMode);
+    showDashboard();
+    renderDashboardView();
+  }
 });
 
 // ---- Date presets ----
@@ -3540,13 +3511,31 @@ document.getElementById('partySelect').addEventListener('change', function () {
 
 // ---- Dashboard / Batch ----
 document.getElementById('backToDashboard').addEventListener('click', () => {
+  if (isCombinedMode) {
+    isCombinedMode = false;
+    combinedKeys = { customerKey: null, supplierKey: null };
+    document.getElementById('modeSelect').value = 'customer';
+    document.getElementById('partyLabel').style.display = '';
+    document.getElementById('partySelect').style.display = '';
+    document.getElementById('combinedPartyRow').style.display = 'none';
+    document.getElementById('batchModeToggle').parentElement.style.display = '';
+    document.getElementById('hideZeroToggle').parentElement.style.display = '';
+    currentMode = 'customer';
+  }
   showDashboard();
   renderDashboardView();
 });
 
-document.getElementById('fetchBtn').addEventListener('click', () => {
-  if (isCombinedMode && combinedKeys.customerKey && combinedKeys.supplierKey) {
-    generateCombinedStatement(combinedKeys.customerKey, combinedKeys.supplierKey);
+document.getElementById('fetchBtn').addEventListener('click', async () => {
+  if (isCombinedMode) {
+    const customerKey = document.getElementById('combinedCustomerSelect').value;
+    const supplierKey = document.getElementById('combinedSupplierSelect').value;
+    if (!customerKey || !supplierKey) {
+      showError('Please select both a customer and a supplier.');
+      return;
+    }
+    combinedKeys = { customerKey, supplierKey };
+    await generateCombinedStatement(customerKey, supplierKey);
     return;
   }
   const selected = document.getElementById('partySelect').value;
@@ -3591,18 +3580,24 @@ document.getElementById('printDashboardBtn').addEventListener('click', () => {
   }, 100);
 });
 document.getElementById('exportBtn').addEventListener('click', () => {
-  if (!currentDisplayRows || currentDisplayRows.length === 0 || !activePartyKey) {
+  if (!currentDisplayRows || currentDisplayRows.length === 0) {
     showError('No data to export. Generate a statement first.');
-  } else {
-    exportCSV(currentDisplayRows, currentRange.from, currentRange.to, currencyFor(activePartyKey));
+    return;
   }
+  const cur = isCombinedMode ? currencyFor(combinedKeys.customerKey) : currencyFor(activePartyKey);
+  exportCSV(currentDisplayRows, currentRange.from, currentRange.to, cur);
 });
 
 // ---- Refresh ----
 document.getElementById('refreshBtn').addEventListener('click', async () => {
   invalidateAllCaches();
-  await loadParties(currentMode);
-  runActiveView();
+  if (isCombinedMode) {
+    await populateCombinedModal();
+    await runActiveView();
+  } else {
+    await loadParties(currentMode);
+    await runActiveView();
+  }
 });
 
 // ---- Date inputs ----
@@ -3623,31 +3618,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderDashboardView();
 });
 
-// ---- Combined Statement Modal ----
-document.getElementById('combinedBtn').addEventListener('click', async () => {
-  document.getElementById('combinedModalError').style.display = 'none';
-  document.getElementById('combinedModal').style.display = 'flex';
-  await populateCombinedModal();
-});
-function closeCombinedModal() {
-  document.getElementById('combinedModal').style.display = 'none';
-}
-document.getElementById('combinedModalClose').addEventListener('click', closeCombinedModal);
-document.getElementById('combinedModalCancel').addEventListener('click', closeCombinedModal);
-document.getElementById('combinedModal').addEventListener('click', function(e) {
-  if (e.target === this) closeCombinedModal();
-});
-document.getElementById('combinedModalGenerate').addEventListener('click', async () => {
-  const customerKey = document.getElementById('combinedCustomerSelect').value;
-  const supplierKey = document.getElementById('combinedSupplierSelect').value;
-  const errDiv = document.getElementById('combinedModalError');
-  if (!customerKey || !supplierKey) {
-    errDiv.textContent = 'Please select both a customer and a supplier.';
-    errDiv.style.display = '';
-    return;
-  }
-  await generateCombinedStatement(customerKey, supplierKey);
-});
+
 </script>
 </body>
 </html>
