@@ -1053,12 +1053,16 @@ function buildTaxCodeMap(taxCodes) {
   return map;
 }
 function buildInvoiceMap(invoices) {
-  const map = {};
+  const map = {};        // key → reference string (for display)
+  const partyMap = {};   // key → { customer, supplier }
   for (const entry of invoices) {
     const inv = entry.item || entry;
-    if (inv.key && inv.reference) map[inv.key] = inv.reference;
+    if (inv.key) {
+      if (inv.reference) map[inv.key] = inv.reference;
+      partyMap[inv.key] = { customer: inv.customer || null, supplier: inv.supplier || null };
+    }
   }
-  return map;
+  return { map, partyMap };
 }
 
 // ================================================================
@@ -1075,7 +1079,11 @@ function indexByTopLevelParty(items, headerField) {
   return map;
 }
 
-function indexJournalsByParty(journals, linePartyField) {
+function indexJournalsByParty(journals, linePartyField, controlAccountKeys, invoicePartyMap, mode) {
+  const isCustomer = mode === 'customer';
+  const invoiceRefField = isCustomer ? 'accountsReceivableSalesInvoice' : 'purchaseInvoice';
+  const lineField = isCustomer ? 'accountsReceivableCustomer' : 'accountsPayableSupplier';
+  const invPartyField = isCustomer ? 'customer' : 'supplier';
   const map = new Map();
   for (const entry of journals) {
     const j = entry.item || entry;
@@ -1083,7 +1091,15 @@ function indexJournalsByParty(journals, linePartyField) {
     const parties = new Set();
     for (const line of lines) {
       if (line.item != null && line.item !== '') continue;
-      if (line[linePartyField]) parties.add(line[linePartyField]);
+      if (!(line.account && controlAccountKeys.includes(line.account))) continue;
+      // Resolve party: invoice ref → line field
+      let partyKey = null;
+      const invKey = line[invoiceRefField];
+      if (invKey && invoicePartyMap[invKey]) {
+        partyKey = invoicePartyMap[invKey][invPartyField] || null;
+      }
+      if (!partyKey) partyKey = line[lineField] || null;
+      if (partyKey) parties.add(partyKey);
     }
     for (const p of parties) {
       if (!map.has(p)) map.set(p, []);
@@ -1093,7 +1109,11 @@ function indexJournalsByParty(journals, linePartyField) {
   return map;
 }
 
-function indexCashDocsByParty(docs, controlAccountKeys, linePartyField, payeeValue, headerPartyField) {
+function indexCashDocsByParty(docs, controlAccountKeys, linePartyField, payeeValue, headerPartyField, invoicePartyMap, mode) {
+  const isCustomer = mode === 'customer';
+  const invoiceRefField = isCustomer ? 'accountsReceivableSalesInvoice' : 'purchaseInvoice';
+  const lineField = isCustomer ? 'accountsReceivableCustomer' : 'accountsPayableSupplier';
+  const invPartyField = isCustomer ? 'customer' : 'supplier';
   const map = new Map();
   for (const entry of docs) {
     const doc = entry.item || entry;
@@ -1105,13 +1125,17 @@ function indexCashDocsByParty(docs, controlAccountKeys, linePartyField, payeeVal
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
       let partyKey = null;
-      if (paidBy === payeeValue) {
-        partyKey = headerParty;
-      } else {
-        partyKey = line[linePartyField];
+      // Invoice-driven lookup takes highest priority
+      const invKey = line[invoiceRefField];
+      if (invKey && invoicePartyMap && invoicePartyMap[invKey]) {
+        partyKey = invoicePartyMap[invKey][invPartyField] || null;
       }
-      if (!partyKey && headerParty) partyKey = headerParty;
-      if (!partyKey) partyKey = line[linePartyField];
+      // Doc-level party (paidBy=1 for customer, paidBy=2 for supplier)
+      if (!partyKey && paidBy === payeeValue && headerParty) {
+        partyKey = headerParty;
+      }
+      // Line-level field
+      if (!partyKey) partyKey = line[lineField] || null;
       if (partyKey) partiesForDoc.add(partyKey);
     }
     for (const p of partiesForDoc) {
@@ -1447,9 +1471,12 @@ function extractCreditNotes(creditNotes, partyKey, mode, itemMap, accountMap, ta
 }
 
 // ---- Receipts ----
-function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap) {
+function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, invoicePartyMap, dp, bankCurrencyMap, baseCurKey, itemMap) {
   const cfg = MODES[mode];
-  const linePartyField = cfg.linePartyField;
+  const isCustomer = mode === 'customer';
+  const invoiceRefField = isCustomer ? 'accountsReceivableSalesInvoice' : 'purchaseInvoice';
+  const lineField = isCustomer ? 'accountsReceivableCustomer' : 'accountsPayableSupplier';
+  const invPartyField = isCustomer ? 'customer' : 'supplier';
   const payeeValue = cfg.payeeValue;
   const result = [];
   const partyCur = currencyFor(partyKey);
@@ -1460,7 +1487,7 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
     const r = entry.item || entry;
     const lines = r.lines || [];
     const paidBy = getPayeeType(r);
-    const headerParty = r[cfg.headerPartyField];
+    const headerParty = r[cfg.headerPartyField] || null;
 
     const bankAccKey = r.receivedIn;
     const docCurKey = bankAccKey ? (bankCurrencyMap[bankAccKey] || null) : null;
@@ -1470,14 +1497,18 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
     for (const line of lines) {
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
+      // Priority 1: invoice-driven party
       let lineParty = null;
-      if (paidBy === payeeValue) {
-        lineParty = headerParty;
-      } else {
-        lineParty = line[linePartyField];
+      const invKey = line[invoiceRefField];
+      if (invKey && invoicePartyMap[invKey]) {
+        lineParty = invoicePartyMap[invKey][invPartyField] || null;
       }
-      if (!lineParty && headerParty) lineParty = headerParty;
-      if (!lineParty) lineParty = line[linePartyField];
+      // Priority 2: doc-level party (paidBy=1 for customer, paidBy=2 for supplier)
+      if (!lineParty && paidBy === payeeValue && headerParty) {
+        lineParty = headerParty;
+      }
+      // Priority 3: line-level field
+      if (!lineParty) lineParty = line[lineField] || null;
       if (lineParty === partyKey) relevantLines.push(line);
     }
     if (relevantLines.length === 0) continue;
@@ -1487,24 +1518,13 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
     const discountType = r.discountType || 0;
     const priceField = cfg.invoiceLinePriceField;
 
-    const details = [];
-    let sumAmount = 0;
-    let singleInvoiceRef = null;
+    const ref = r.reference || '';
+    const displayType = (r.hasReceiptCustomTitle && r.receiptCustomTitle) ? r.receiptCustomTitle : 'Receipt';
+    const docDesc = r.description || null;
+    const timestamp = parseFloat(r.timestamp) || 0;
+    const date = r.date || r.issueDate;
 
-    let displayDesc = r.description || null;
-    if (relevantLines.length === 1 && r.hasLineDescription === true) {
-      const line = relevantLines[0];
-      if (line.lineDescription) {
-        displayDesc = line.lineDescription;
-      }
-    }
-
-    let displayType = 'Receipt';
-    if (r.hasReceiptCustomTitle && r.receiptCustomTitle) {
-      displayType = r.receiptCustomTitle;
-    }
-
-    for (const line of relevantLines) {
+    relevantLines.forEach((line, lineIndex) => {
       // Qty/unit/price for display
       let qtyValue = null;
       let unitName = '';
@@ -1512,17 +1532,12 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
       if (r.quantityColumn === true) {
         qtyValue = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
         if (qtyValue !== null && qtyValue !== 0) {
-          if (line.item && itemMap[line.item]) {
-            unitName = itemMap[line.item].unit || '';
-          }
+          if (line.item && itemMap[line.item]) unitName = itemMap[line.item].unit || '';
           priceValue = parseFloat(line[priceField]) || 0;
         }
       }
 
-      // Amount in document currency:
-      //   unitPriceColumn + quantityColumn → qty * unitPrice
-      //   unitPriceColumn only            → unitPrice
-      //   neither                         → line.amount
+      // Amount in document currency
       let amountInDocCur = 0;
       const linePrice = parseFloat(line[priceField]) || 0;
       const lineQty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
@@ -1534,7 +1549,6 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
       } else {
         amountInDocCur = parseFloat(line.amount) || 0;
       }
-      // Apply discount if enabled — regardless of unitPriceMode
       if (discountEnabled) {
         const discPct = parseFloat(line.discountPercentage) || 0;
         const discAmt = parseFloat(line.discountAmount) || 0;
@@ -1543,71 +1557,53 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
       }
       amountInDocCur = roundToCurrencyDp(amountInDocCur, docDecimals);
 
-      // Currency conversion:
-      //   same currency                          → amountInDocCur as-is
-      //   different currency, currencyAmount set → use currencyAmount directly
-      //   different currency, no currencyAmount  → convert via rate map
+      // Currency conversion
       let finalAmount = amountInDocCur;
       const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
       if (docCurKeyEffective !== partyCurKey && lineCurrencyAmount !== 0) {
         finalAmount = lineCurrencyAmount;
       } else if (docCurKeyEffective !== partyCurKey) {
-        finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(r.date), baseCurKey);
+        finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(date), baseCurKey);
       }
       finalAmount = roundToCurrencyDp(finalAmount, partyDecimals);
-      sumAmount = roundToCurrencyDp(sumAmount + finalAmount, partyDecimals);
 
-      let desc = line.lineDescription || '';
+      // Description: line description → doc description → account name
+      let desc = line.lineDescription || docDesc || '';
       if (!desc && line.account && accountMap[line.account]) desc = accountMap[line.account];
 
-      let invRef = null;
+      // Invoice reference appended to description
       const invRefKey = line.accountsReceivableSalesInvoice || line.purchaseInvoice || null;
       if (invRefKey && invoiceMap[invRefKey]) {
-        invRef = invoiceMap[invRefKey];
-        if (relevantLines.length === 1) singleInvoiceRef = invRef;
-        else desc = desc ? `${desc} (Inv #${invRef})` : `(Inv #${invRef})`;
+        const invRef = invoiceMap[invRefKey];
+        desc = desc ? `${desc} (Inv #${invRef})` : `Inv #${invRef}`;
       }
 
-      details.push({
-        description: desc,
-        qty: qtyValue,
-        unitName: unitName,
-        price: priceValue,
-        baseAmount: finalAmount,
-        taxAmount: 0,
-        total: finalAmount,
-        discountText: '',
-        taxDisplay: null
+      result.push({
+        transactionKey: r.key + (relevantLines.length > 1 ? `-${lineIndex}` : ''),
+        type: 'Receipt',
+        displayType,
+        reference: ref,
+        timestamp,
+        date,
+        displayRef: ref ? `#${ref}` : '',
+        displayDescription: desc || null,
+        amount: -finalAmount,
+        isDebit: false,
+        isCredit: true,
+        lineDetails: []
       });
-    }
-
-    const ref = r.reference || '';
-    if (relevantLines.length === 1 && singleInvoiceRef) {
-      displayDesc = displayDesc ? `${displayDesc} (Inv #${singleInvoiceRef})` : `Inv #${singleInvoiceRef}`;
-    }
-
-    result.push({
-      transactionKey: r.key,
-      type: 'Receipt',
-      displayType: displayType,
-      reference: ref,
-      timestamp: parseFloat(r.timestamp) || 0,
-      date: r.date || r.issueDate,
-      displayRef: ref ? `#${ref}` : '',
-      displayDescription: displayDesc,
-      amount: -sumAmount,
-      isDebit: false,
-      isCredit: true,
-      lineDetails: relevantLines.length > 1 ? details : []
     });
   }
   return result;
 }
 
 // ---- Payments ----
-function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap) {
+function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, invoicePartyMap, dp, bankCurrencyMap, baseCurKey, itemMap) {
   const cfg = MODES[mode];
-  const linePartyField = cfg.linePartyField;
+  const isCustomer = mode === 'customer';
+  const invoiceRefField = isCustomer ? 'accountsReceivableSalesInvoice' : 'purchaseInvoice';
+  const lineField = isCustomer ? 'accountsReceivableCustomer' : 'accountsPayableSupplier';
+  const invPartyField = isCustomer ? 'customer' : 'supplier';
   const payeeValue = cfg.payeeValue;
   const isDebit = cfg.paymentIsDebit;
   const result = [];
@@ -1619,7 +1615,7 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
     const p = entry.item || entry;
     const lines = p.lines || [];
     const paidBy = getPayeeType(p);
-    const headerParty = p[cfg.headerPartyField];
+    const headerParty = p[cfg.headerPartyField] || null;
 
     const bankAccKey = p.paidFrom;
     const docCurKey = bankAccKey ? (bankCurrencyMap[bankAccKey] || null) : null;
@@ -1629,14 +1625,18 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
     for (const line of lines) {
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
+      // Priority 1: invoice-driven party
       let lineParty = null;
-      if (paidBy === payeeValue) {
-        lineParty = headerParty;
-      } else {
-        lineParty = line[linePartyField];
+      const invKey = line[invoiceRefField];
+      if (invKey && invoicePartyMap[invKey]) {
+        lineParty = invoicePartyMap[invKey][invPartyField] || null;
       }
-      if (!lineParty && headerParty) lineParty = headerParty;
-      if (!lineParty) lineParty = line[linePartyField];
+      // Priority 2: doc-level party (payee=1 for customer, payee=2 for supplier)
+      if (!lineParty && paidBy === payeeValue && headerParty) {
+        lineParty = headerParty;
+      }
+      // Priority 3: line-level field
+      if (!lineParty) lineParty = line[lineField] || null;
       if (lineParty === partyKey) relevantLines.push(line);
     }
     if (relevantLines.length === 0) continue;
@@ -1646,42 +1646,24 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
     const discountType = p.discountType || 0;
     const priceField = cfg.invoiceLinePriceField;
 
-    const details = [];
-    let sumAmount = 0;
-    let singleInvoiceRef = null;
+    const ref = p.reference || '';
+    const displayType = (p.hasPaymentCustomTitle && p.paymentCustomTitle) ? p.paymentCustomTitle : 'Payment';
+    const docDesc = p.description || null;
+    const timestamp = parseFloat(p.timestamp) || 0;
+    const date = p.date || p.issueDate;
 
-    let displayDesc = p.description || null;
-    if (relevantLines.length === 1 && p.hasLineDescription === true) {
-      const line = relevantLines[0];
-      if (line.lineDescription) {
-        displayDesc = line.lineDescription;
-      }
-    }
-
-    let displayType = 'Payment';
-    if (p.hasPaymentCustomTitle && p.paymentCustomTitle) {
-      displayType = p.paymentCustomTitle;
-    }
-
-    for (const line of relevantLines) {
-      // Qty/unit/price for display
+    relevantLines.forEach((line, lineIndex) => {
       let qtyValue = null;
       let unitName = '';
       let priceValue = 0;
       if (p.quantityColumn === true) {
         qtyValue = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
         if (qtyValue !== null && qtyValue !== 0) {
-          if (line.item && itemMap[line.item]) {
-            unitName = itemMap[line.item].unit || '';
-          }
+          if (line.item && itemMap[line.item]) unitName = itemMap[line.item].unit || '';
           priceValue = parseFloat(line[priceField]) || 0;
         }
       }
 
-      // Amount in document currency:
-      //   unitPriceColumn + quantityColumn → qty * unitPrice
-      //   unitPriceColumn only            → unitPrice
-      //   neither                         → line.amount
       let amountInDocCur = 0;
       const linePrice = parseFloat(line[priceField]) || 0;
       const lineQty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
@@ -1693,7 +1675,6 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
       } else {
         amountInDocCur = parseFloat(line.amount) || 0;
       }
-      // Apply discount if enabled — regardless of unitPriceMode
       if (discountEnabled) {
         const discPct = parseFloat(line.discountPercentage) || 0;
         const discAmt = parseFloat(line.discountAmount) || 0;
@@ -1702,71 +1683,50 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
       }
       amountInDocCur = roundToCurrencyDp(amountInDocCur, docDecimals);
 
-      // Currency conversion:
-      //   same currency                          → amountInDocCur as-is
-      //   different currency, currencyAmount set → use currencyAmount directly
-      //   different currency, no currencyAmount  → convert via rate map
       let finalAmount = amountInDocCur;
       const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
       if (docCurKeyEffective !== partyCurKey && lineCurrencyAmount !== 0) {
         finalAmount = lineCurrencyAmount;
       } else if (docCurKeyEffective !== partyCurKey) {
-        finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(p.date), baseCurKey);
+        finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(date), baseCurKey);
       }
       finalAmount = roundToCurrencyDp(finalAmount, partyDecimals);
-      sumAmount = roundToCurrencyDp(sumAmount + finalAmount, partyDecimals);
 
-      let desc = line.lineDescription || '';
+      let desc = line.lineDescription || docDesc || '';
       if (!desc && line.account && accountMap[line.account]) desc = accountMap[line.account];
 
-      let invRef = null;
       const invRefKey = line.accountsReceivableSalesInvoice || line.purchaseInvoice || null;
       if (invRefKey && invoiceMap[invRefKey]) {
-        invRef = invoiceMap[invRefKey];
-        if (relevantLines.length === 1) singleInvoiceRef = invRef;
-        else desc = desc ? `${desc} (Inv #${invRef})` : `(Inv #${invRef})`;
+        const invRef = invoiceMap[invRefKey];
+        desc = desc ? `${desc} (Inv #${invRef})` : `Inv #${invRef}`;
       }
 
-      details.push({
-        description: desc,
-        qty: qtyValue,
-        unitName: unitName,
-        price: priceValue,
-        baseAmount: finalAmount,
-        taxAmount: 0,
-        total: finalAmount,
-        discountText: '',
-        taxDisplay: null
+      result.push({
+        transactionKey: p.key + (relevantLines.length > 1 ? `-${lineIndex}` : ''),
+        type: 'Payment',
+        displayType,
+        reference: ref,
+        timestamp,
+        date,
+        displayRef: ref ? `#${ref}` : '',
+        displayDescription: desc || null,
+        amount: isDebit ? finalAmount : -finalAmount,
+        isDebit: isDebit,
+        isCredit: !isDebit,
+        lineDetails: []
       });
-    }
-
-    const ref = p.reference || '';
-    if (relevantLines.length === 1 && singleInvoiceRef) {
-      displayDesc = displayDesc ? `${displayDesc} (Inv #${singleInvoiceRef})` : `Inv #${singleInvoiceRef}`;
-    }
-
-    result.push({
-      transactionKey: p.key,
-      type: 'Payment',
-      displayType: displayType,
-      reference: ref,
-      timestamp: parseFloat(p.timestamp) || 0,
-      date: p.date || p.issueDate,
-      displayRef: ref ? `#${ref}` : '',
-      displayDescription: displayDesc,
-      amount: isDebit ? sumAmount : -sumAmount,
-      isDebit: isDebit,
-      isCredit: !isDebit,
-      lineDetails: relevantLines.length > 1 ? details : []
     });
   }
   return result;
 }
 
 // ---- Journal Entries (badge uses line description or narration) ----
-function extractJournalEntries(journals, partyKey, mode, accountMap, invoiceMap, dp, baseCurKey) {
+function extractJournalEntries(journals, partyKey, mode, controlAccountKeys, accountMap, invoiceMap, invoicePartyMap, dp, baseCurKey) {
   const cfg = MODES[mode];
-  const linePartyField = cfg.linePartyField;
+  const isCustomer = mode === 'customer';
+  const invoiceRefField = isCustomer ? 'accountsReceivableSalesInvoice' : 'purchaseInvoice';
+  const lineField = isCustomer ? 'accountsReceivableCustomer' : 'accountsPayableSupplier';
+  const invPartyField = isCustomer ? 'customer' : 'supplier';
   const result = [];
   const partyCur = currencyFor(partyKey);
   const partyCurKey = partyCur.key;
@@ -1776,9 +1736,19 @@ function extractJournalEntries(journals, partyKey, mode, accountMap, invoiceMap,
   for (const entry of journals) {
     const j = entry.item || entry;
     const lines = j.lines || [];
+
+    // Filter: account must be in controlAccountKeys; party resolved via invoice or line field
     const relevantLines = lines.filter(line => {
       if (line.item != null && line.item !== '') return false;
-      return line[linePartyField] === partyKey;
+      if (!(line.account && controlAccountKeys.includes(line.account))) return false;
+      // Resolve party
+      let resolvedParty = null;
+      const invKey = line[invoiceRefField];
+      if (invKey && invoicePartyMap[invKey]) {
+        resolvedParty = invoicePartyMap[invKey][invPartyField] || null;
+      }
+      if (!resolvedParty) resolvedParty = line[lineField] || null;
+      return resolvedParty === partyKey;
     });
     if (relevantLines.length === 0) continue;
 
@@ -1791,89 +1761,58 @@ function extractJournalEntries(journals, partyKey, mode, accountMap, invoiceMap,
     const docExRate = parseFloat(j.exchangeRate) || 0;
     const docExRateIsInverse = j.exchangeRateIsInverse === true;
 
-    const details = [];
-    let netAmount = 0;
-    let singleInvoiceRef = null;
+    const ref = j.reference || '';
+    const docDesc = j.narration || null;
+    const timestamp = parseFloat(j.timestamp) || 0;
+    const date = j.date || j.issueDate;
 
-    // displayDescription: line description (single line + hasLineDescription) → narration → null
-    let displayDesc = j.narration || null;
-    if (relevantLines.length === 1 && j.hasLineDescription === true) {
-      const line = relevantLines[0];
-      if (line.lineDescription) displayDesc = line.lineDescription;
-    }
-
-    for (const line of relevantLines) {
+    relevantLines.forEach((line, lineIndex) => {
       const debit = parseFloat(line.debit) || 0;
       const credit = parseFloat(line.credit) || 0;
-      // debit/credit are always in base currency
       const amountInBase = roundToCurrencyDp(debit - credit, baseDecimals);
 
       let finalAmount;
       const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
 
       if (docCurKeyEffective === partyCurKey) {
-        // Same currency - use base amount directly, no conversion.
         finalAmount = amountInBase;
       } else if (lineCurrencyAmount !== 0) {
-        // Different currency, Manager stored party-currency amount - use it directly.
         finalAmount = lineCurrencyAmount;
       } else if (docExRate !== 0) {
-        // Different currency, no currencyAmount - convert using doc-level exchange rate.
         if (docExRateIsInverse) {
           finalAmount = roundToCurrencyDp(amountInBase / docExRate, partyDecimals);
         } else {
           finalAmount = roundToCurrencyDp(amountInBase * docExRate, partyDecimals);
         }
       } else {
-        // No currencyAmount, no doc rate - fall back to rate map.
-        finalAmount = convertAmount(amountInBase, baseCurKey, partyCurKey, dateOnly(j.date), baseCurKey);
+        finalAmount = convertAmount(amountInBase, baseCurKey, partyCurKey, dateOnly(date), baseCurKey);
       }
-
       finalAmount = roundToCurrencyDp(finalAmount, partyDecimals);
-      netAmount = roundToCurrencyDp(netAmount + finalAmount, partyDecimals);
 
-      let desc = line.lineDescription || '';
+      // Description: line description → narration → account name
+      let desc = line.lineDescription || docDesc || '';
       if (!desc && line.account && accountMap[line.account]) desc = accountMap[line.account];
 
-      let invRef = null;
       const invRefKey = line.accountsReceivableSalesInvoice || line.purchaseInvoice || null;
       if (invRefKey && invoiceMap[invRefKey]) {
-        invRef = invoiceMap[invRefKey];
-        if (relevantLines.length === 1) singleInvoiceRef = invRef;
-        else desc = desc ? `${desc} (Inv #${invRef})` : `(Inv #${invRef})`;
+        const invRef = invoiceMap[invRefKey];
+        desc = desc ? `${desc} (Inv #${invRef})` : `Inv #${invRef}`;
       }
 
-      details.push({
-        description: desc,
-        qty: null,
-        unitName: '',
-        price: 0,
-        baseAmount: finalAmount,
-        taxAmount: 0,
-        total: finalAmount,
-        discountText: '',
-        taxDisplay: null
+      const lineIsDebit = finalAmount > 0;
+      result.push({
+        transactionKey: j.key + (relevantLines.length > 1 ? `-${lineIndex}` : ''),
+        type: 'Journal Entry',
+        reference: ref,
+        timestamp,
+        date,
+        displayRef: ref ? `#${ref}` : '',
+        displayDescription: desc || null,
+        amount: finalAmount,
+        isDebit: lineIsDebit,
+        isCredit: !lineIsDebit,
+        lineDetails: []
       });
-    }
-
-    const ref = j.reference || '';
-    if (relevantLines.length === 1 && singleInvoiceRef) {
-      displayDesc = displayDesc ? `${displayDesc} (Inv #${singleInvoiceRef})` : `Inv #${singleInvoiceRef}`;
-    }
-
-    const isDebit = netAmount > 0;
-    result.push({
-      transactionKey: j.key,
-      type: 'Journal Entry',
-      reference: ref,
-      timestamp: parseFloat(j.timestamp) || 0,
-      date: j.date || j.issueDate,
-      displayRef: ref ? `#${ref}` : '',
-      displayDescription: displayDesc,
-      amount: netAmount,
-      isDebit: isDebit,
-      isCredit: !isDebit,
-      lineDetails: relevantLines.length > 1 ? details : []
     });
   }
   return result;
@@ -1918,18 +1857,18 @@ const TYPE_PRIORITY = {
   'Journal Entry': 6
 };
 
-function collectAllTransactions(partyKey, idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey) {
+function collectAllTransactions(partyKey, idx, mode, refs, invoiceMap, invoicePartyMap, bankCurrencyMap, baseCurKey) {
   const cfg = MODES[mode];
   const partyCur = currencyFor(partyKey);
   const dp = partyCur.decimals === undefined ? 2 : partyCur.decimals;
   const itemMap = refs.itemMap;
 
   let allTransactions = [
-    ...extractReceipts(forParty(idx.receipts, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap),
-    ...extractPayments(forParty(idx.payments, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, dp, bankCurrencyMap, baseCurKey, itemMap),
+    ...extractReceipts(forParty(idx.receipts, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, invoicePartyMap, dp, bankCurrencyMap, baseCurKey, itemMap),
+    ...extractPayments(forParty(idx.payments, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, invoicePartyMap, dp, bankCurrencyMap, baseCurKey, itemMap),
     ...extractInvoiceLines(forParty(idx.invoices, partyKey), partyKey, mode, refs.itemMap, refs.accountMap, refs.taxCodeMap, dp),
     ...extractCreditNotes(forParty(idx.creditNotes, partyKey), partyKey, mode, refs.itemMap, refs.accountMap, refs.taxCodeMap, dp),
-    ...extractJournalEntries(forParty(idx.journals, partyKey), partyKey, mode, refs.accountMap, invoiceMap, dp, baseCurKey),
+    ...extractJournalEntries(forParty(idx.journals, partyKey), partyKey, mode, refs.controlAccountKeys, refs.accountMap, invoiceMap, invoicePartyMap, dp, baseCurKey),
   ];
 
   if (mode === 'customer') {
@@ -2514,18 +2453,21 @@ async function getTransactionalData(mode) {
   const headerField = cfg.headerPartyField;
   const linePartyField = cfg.linePartyField;
   const payeeValue = cfg.payeeValue;
+  const uniqueKeys = refs.controlAccountKeys;
+
+  // Build invoice maps first — needed by indexJournalsByParty
+  const { map: invoiceMap, partyMap: invoicePartyMap } = buildInvoiceMap(allInvoicesForMap);
 
   const idx = {
-    receipts: indexCashDocsByParty(receipts, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
-    payments: indexCashDocsByParty(payments, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
+    receipts: indexCashDocsByParty(receipts, refs.controlAccountKeys, linePartyField, payeeValue, headerField, invoicePartyMap, mode),
+    payments: indexCashDocsByParty(payments, refs.controlAccountKeys, linePartyField, payeeValue, headerField, invoicePartyMap, mode),
     invoices: indexByTopLevelParty(invoices, headerField),
     creditNotes: indexByTopLevelParty(creditNotes, headerField),
-    journals: indexJournalsByParty(journals, linePartyField),
+    journals: indexJournalsByParty(journals, linePartyField, uniqueKeys, invoicePartyMap, mode),
     fees: indexByTopLevelParty(fees, headerField)
   };
 
-  const invoiceMap = buildInvoiceMap(allInvoicesForMap);
-  const data = { idx, invoiceMap, refs };
+  const data = { idx, invoiceMap, invoicePartyMap, refs };
   transactionalDataCache = { mode, data, ts: Date.now() };
   return data;
 }
@@ -2571,6 +2513,7 @@ async function renderDashboardView() {
     const td = await getTransactionalData(mode);
     const refs = td.refs;
     const invoiceMap = td.invoiceMap;
+    const invoicePartyMap = td.invoicePartyMap || {};
     const bankCurrencyMap = refs.bankCurrencyMap;
     const rateMap = refs.exchangeRateMap;
     exchangeRateMap = rateMap;
@@ -2593,7 +2536,7 @@ async function renderDashboardView() {
       }
       const agg = byCurrency[curKey];
 
-      const { allTransactions } = collectAllTransactions(party.key, td.idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey);
+      const { allTransactions } = collectAllTransactions(party.key, td.idx, mode, refs, invoiceMap, invoicePartyMap, bankCurrencyMap, baseCurKey);
       const { transactions, openingBalance } = computeRows(allTransactions, fromDate, toDate, cur.decimals);
 
       let balance = openingBalance;
@@ -2920,6 +2863,7 @@ async function generateStatement(partyKey) {
     const td = await getTransactionalData(mode);
     const refs = td.refs;
     const invoiceMap = td.invoiceMap;
+    const invoicePartyMap = td.invoicePartyMap || {};
     const bankCurrencyMap = refs.bankCurrencyMap;
     const rateMap = refs.exchangeRateMap;
     exchangeRateMap = rateMap;
@@ -2953,7 +2897,7 @@ async function generateStatement(partyKey) {
 
     if (myGeneration !== currentGeneration) return;
 
-    const { allTransactions, allDates } = collectAllTransactions(partyKey, td.idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey);
+    const { allTransactions, allDates } = collectAllTransactions(partyKey, td.idx, mode, refs, invoiceMap, invoicePartyMap, bankCurrencyMap, baseCurKey);
 
     if (document.getElementById('rangePreset').value === 'from-start') {
       const earliest = allDates.length > 0 ? allDates.reduce((a, b) => (a < b ? a : b)) : fromDate;
@@ -3014,6 +2958,7 @@ async function generateBatchStatements(partyKeys) {
     const td = await getTransactionalData(mode);
     const refs = td.refs;
     const invoiceMap = td.invoiceMap;
+    const invoicePartyMap = td.invoicePartyMap || {};
     const bankCurrencyMap = refs.bankCurrencyMap;
     const rateMap = refs.exchangeRateMap;
     exchangeRateMap = rateMap;
@@ -3035,7 +2980,7 @@ async function generateBatchStatements(partyKeys) {
 
       warnings = { undated: false, controlDegraded: refs.controlDegraded, zeroLineDocs: false, currencyMismatch: false };
 
-      const { allTransactions, allDates } = collectAllTransactions(partyKey, td.idx, mode, refs, invoiceMap, bankCurrencyMap, baseCurKey);
+      const { allTransactions, allDates } = collectAllTransactions(partyKey, td.idx, mode, refs, invoiceMap, invoicePartyMap, bankCurrencyMap, baseCurKey);
 
       let localFromDate = fromDate;
       if (document.getElementById('rangePreset').value === 'from-start') {
@@ -3154,8 +3099,8 @@ async function generateCombinedStatement(customerKey, supplierKey) {
     // Collect transactions for each party
     warnings = { undated: false, controlDegraded: false, zeroLineDocs: false, currencyMismatch: false };
     const baseCurKey = baseCurrencyInfo ? baseCurrencyInfo.key : null;
-    const { allTransactions: custRaw } = collectAllTransactions(customerKey, custTd.idx, 'customer', custTd.refs, custTd.invoiceMap, custTd.refs.bankCurrencyMap, baseCurKey);
-    const { allTransactions: suppRaw } = collectAllTransactions(supplierKey, suppTd.idx, 'supplier', suppTd.refs, suppTd.invoiceMap, suppTd.refs.bankCurrencyMap, baseCurKey);
+    const { allTransactions: custRaw } = collectAllTransactions(customerKey, custTd.idx, 'customer', custTd.refs, custTd.invoiceMap, custTd.invoicePartyMap || {}, custTd.refs.bankCurrencyMap, baseCurKey);
+    const { allTransactions: suppRaw } = collectAllTransactions(supplierKey, suppTd.idx, 'supplier', suppTd.refs, suppTd.invoiceMap, suppTd.invoicePartyMap || {}, suppTd.refs.bankCurrencyMap, baseCurKey);
 
     // Tag source; override displayType for badge disambiguation in combined view
     for (const t of custRaw) {
@@ -3237,18 +3182,21 @@ async function getTransactionalDataForMode(mode) {
   const headerField = cfg.headerPartyField;
   const linePartyField = cfg.linePartyField;
   const payeeValue = cfg.payeeValue;
+  const uniqueKeys = refs.controlAccountKeys;
+
+  // Build invoice maps first — needed by indexJournalsByParty
+  const { map: invoiceMap, partyMap: invoicePartyMap } = buildInvoiceMap(allInvoicesForMap);
 
   const idx = {
-    receipts: indexCashDocsByParty(receipts, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
-    payments: indexCashDocsByParty(payments, refs.controlAccountKeys, linePartyField, payeeValue, headerField),
+    receipts: indexCashDocsByParty(receipts, refs.controlAccountKeys, linePartyField, payeeValue, headerField, invoicePartyMap, mode),
+    payments: indexCashDocsByParty(payments, refs.controlAccountKeys, linePartyField, payeeValue, headerField, invoicePartyMap, mode),
     invoices: indexByTopLevelParty(invoices, headerField),
     creditNotes: indexByTopLevelParty(creditNotes, headerField),
-    journals: indexJournalsByParty(journals, linePartyField),
+    journals: indexJournalsByParty(journals, linePartyField, uniqueKeys, invoicePartyMap, mode),
     fees: indexByTopLevelParty(fees, headerField)
   };
 
-  const invoiceMap = buildInvoiceMap(allInvoicesForMap);
-  const data = { idx, invoiceMap, refs };
+  const data = { idx, invoiceMap, invoicePartyMap, refs };
   transactionalDataCacheByMode[mode] = { data, ts: Date.now() };
   return data;
 }
