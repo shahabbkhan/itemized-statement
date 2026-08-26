@@ -1542,11 +1542,11 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
       const linePrice = parseFloat(line[priceField]) || 0;
       const lineQty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
       if (unitPriceMode && r.quantityColumn === true) {
+        // Both qty and unitprice columns enabled → calculate
         const effectiveQty = (lineQty === null || isNaN(lineQty)) ? 1 : lineQty;
         amountInDocCur = effectiveQty * linePrice;
-      } else if (unitPriceMode) {
-        amountInDocCur = linePrice;
       } else {
+        // Any other combination → use line amount directly
         amountInDocCur = parseFloat(line.amount) || 0;
       }
       if (discountEnabled) {
@@ -1578,6 +1578,7 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
         desc = desc ? `${desc} (Inv #${invRef})` : `Inv #${invRef}`;
       }
 
+      const recAmount = -finalAmount;
       result.push({
         transactionKey: r.key + (relevantLines.length > 1 ? `-${lineIndex}` : ''),
         type: 'Receipt',
@@ -1587,9 +1588,9 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
         date,
         displayRef: ref ? `#${ref}` : '',
         displayDescription: desc || null,
-        amount: -finalAmount,
-        isDebit: false,
-        isCredit: true,
+        amount: recAmount,
+        isDebit: recAmount > 0,
+        isCredit: recAmount < 0,
         lineDetails: []
       });
     });
@@ -1668,11 +1669,11 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
       const linePrice = parseFloat(line[priceField]) || 0;
       const lineQty = line.qty !== undefined && line.qty !== null ? parseFloat(line.qty) : null;
       if (unitPriceMode && p.quantityColumn === true) {
+        // Both qty and unitprice columns enabled → calculate
         const effectiveQty = (lineQty === null || isNaN(lineQty)) ? 1 : lineQty;
         amountInDocCur = effectiveQty * linePrice;
-      } else if (unitPriceMode) {
-        amountInDocCur = linePrice;
       } else {
+        // Any other combination → use line amount directly
         amountInDocCur = parseFloat(line.amount) || 0;
       }
       if (discountEnabled) {
@@ -1701,6 +1702,7 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
         desc = desc ? `${desc} (Inv #${invRef})` : `Inv #${invRef}`;
       }
 
+      const payAmount = isDebit ? finalAmount : -finalAmount;
       result.push({
         transactionKey: p.key + (relevantLines.length > 1 ? `-${lineIndex}` : ''),
         type: 'Payment',
@@ -1710,9 +1712,9 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
         date,
         displayRef: ref ? `#${ref}` : '',
         displayDescription: desc || null,
-        amount: isDebit ? finalAmount : -finalAmount,
-        isDebit: isDebit,
-        isCredit: !isDebit,
+        amount: payAmount,
+        isDebit: payAmount > 0,
+        isCredit: payAmount < 0,
         lineDetails: []
       });
     });
