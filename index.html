@@ -1567,7 +1567,8 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
       let finalAmount = amountInDocCur;
       const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
       if (docCurKeyEffective !== partyCurKey && lineCurrencyAmount !== 0) {
-        finalAmount = lineCurrencyAmount;
+        // lineCurrencyAmount is stored as absolute — apply sign from amountInDocCur
+        finalAmount = amountInDocCur >= 0 ? Math.abs(lineCurrencyAmount) : -Math.abs(lineCurrencyAmount);
       } else if (docCurKeyEffective !== partyCurKey) {
         finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(date), baseCurKey);
       }
@@ -1693,7 +1694,8 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
       let finalAmount = amountInDocCur;
       const lineCurrencyAmount = parseFloat(line.currencyAmount) || 0;
       if (docCurKeyEffective !== partyCurKey && lineCurrencyAmount !== 0) {
-        finalAmount = lineCurrencyAmount;
+        // lineCurrencyAmount is stored as absolute — apply sign from amountInDocCur
+        finalAmount = amountInDocCur >= 0 ? Math.abs(lineCurrencyAmount) : -Math.abs(lineCurrencyAmount);
       } else if (docCurKeyEffective !== partyCurKey) {
         finalAmount = convertAmount(amountInDocCur, docCurKeyEffective, partyCurKey, dateOnly(date), baseCurKey);
       }
