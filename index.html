@@ -1300,6 +1300,8 @@ function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxC
       displayType = 'Invoice';
     }
 
+    const invAmount = isDebit ? invoiceTotal : -invoiceTotal;
+    const invIsDebit = invAmount > 0;
     result.push({
       transactionKey: inv.key,
       type: mode === 'customer' ? 'Invoice' : 'Purchase Invoice',
@@ -1309,9 +1311,9 @@ function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxC
       date: inv.issueDate,
       displayRef: ref ? `#${ref}` : '',
       displayDescription: inv.description || null,
-      amount: isDebit ? invoiceTotal : -invoiceTotal,
-      isDebit: isDebit,
-      isCredit: !isDebit,
+      amount: invAmount,
+      isDebit: invIsDebit,
+      isCredit: !invIsDebit,
       lineDetails: details
     });
 
@@ -1325,7 +1327,9 @@ function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxC
         whAmount = roundToCurrencyDp(parseFloat(inv.withholdingTaxAmount) || 0, dp);
       }
       if (whAmount > 0) {
-          const whtDesc = ref ? `Invoice #${ref}` : 'Invoice';
+        const whtDesc = ref ? `Invoice #${ref}` : 'Invoice';
+        // WHT is always opposite side to the invoice
+        const whtAmount = invIsDebit ? -whAmount : whAmount;
         result.push({
           transactionKey: inv.key + '-wht',
           type: 'Withholding Tax',
@@ -1335,9 +1339,9 @@ function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxC
           date: inv.issueDate,
           displayRef: '',
           displayDescription: whtDesc,
-          amount: isDebit ? -whAmount : whAmount,
-          isDebit: !isDebit,
-          isCredit: isDebit,
+          amount: whtAmount,
+          isDebit: whtAmount > 0,
+          isCredit: whtAmount < 0,
           lineDetails: []
         });
       }
@@ -1452,6 +1456,8 @@ function extractCreditNotes(creditNotes, partyKey, mode, itemMap, accountMap, ta
       }
     }
 
+    const cnAmount = isDebit ? amountTotal : -amountTotal;
+    const cnIsDebit = cnAmount > 0;
     result.push({
       transactionKey: cn.key,
       type: mode === 'customer' ? 'Credit Note' : 'Debit Note',
@@ -1461,9 +1467,9 @@ function extractCreditNotes(creditNotes, partyKey, mode, itemMap, accountMap, ta
       date: cn.issueDate,
       displayRef: ref ? `#${ref}` : '',
       displayDescription: cn.description || null,
-      amount: isDebit ? amountTotal : -amountTotal,
-      isDebit: isDebit,
-      isCredit: !isDebit,
+      amount: cnAmount,
+      isDebit: cnIsDebit,
+      isCredit: !cnIsDebit,
       lineDetails: details
     });
   }
@@ -1779,7 +1785,8 @@ function extractJournalEntries(journals, partyKey, mode, controlAccountKeys, acc
       if (docCurKeyEffective === partyCurKey) {
         finalAmount = amountInBase;
       } else if (lineCurrencyAmount !== 0) {
-        finalAmount = lineCurrencyAmount;
+        // lineCurrencyAmount is always stored as absolute value — apply sign from amountInBase
+        finalAmount = amountInBase >= 0 ? Math.abs(lineCurrencyAmount) : -Math.abs(lineCurrencyAmount);
       } else if (docExRate !== 0) {
         if (docExRateIsInverse) {
           finalAmount = roundToCurrencyDp(amountInBase / docExRate, partyDecimals);
@@ -1839,8 +1846,8 @@ function extractLatePaymentFees(fees, partyKey, invoiceMap, dp) {
       displayRef: ref ? `#${ref}` : '',
       displayDescription: displayDesc,
       amount: amount,
-      isDebit: true,
-      isCredit: false,
+      isDebit: amount > 0,
+      isCredit: amount < 0,
       lineDetails: []
     });
   }
