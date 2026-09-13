@@ -33,6 +33,7 @@ body{
   border:none;
   border-radius:8px;
   box-shadow:0 1px 4px rgba(0,0,0,.10),0 4px 16px rgba(0,0,0,.06);
+  position:relative;
 }
 
 /* ---- Toolbar ---- */
@@ -395,6 +396,50 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
 .combined-badge.customer{background:#e8f4fd;color:#1a6fa8;}
 .combined-badge.supplier{background:#fef3e2;color:#b45309;}
 
+/* ---- Tag selector for combined mode ---- */
+.tag-selector{
+  display:flex;flex-direction:column;gap:4px;min-width:220px;max-width:280px;
+}
+.tag-selector-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6c757d;}
+.tag-input-wrap{
+  display:flex;flex-wrap:wrap;gap:4px;align-items:center;
+  padding:4px 6px;border:1px solid #ced4da;border-radius:5px;
+  background:#fff;cursor:text;min-height:32px;
+}
+.tag-input-wrap:focus-within{border-color:var(--accent);}
+.tag-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  background:#e8f0fe;color:#1a4fa8;
+  border-radius:4px;padding:2px 6px;font-size:.74rem;font-weight:600;
+  white-space:nowrap;max-width:160px;
+}
+.tag-chip.supplier-chip{background:#fef3e2;color:#b45309;}
+.tag-chip span{overflow:hidden;text-overflow:ellipsis;}
+.tag-chip button{
+  background:none;border:none;cursor:pointer;
+  color:inherit;opacity:.6;padding:0;font-size:.85rem;line-height:1;
+  flex-shrink:0;
+}
+.tag-chip button:hover{opacity:1;}
+.tag-search{
+  border:none;outline:none;font-size:.8rem;font-family:inherit;
+  min-width:80px;flex:1;background:transparent;padding:2px 0;
+}
+.tag-dropdown{
+  position:absolute;z-index:200;background:#fff;
+  border:1px solid #ced4da;border-radius:5px;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+  max-height:200px;overflow-y:auto;min-width:220px;
+  font-size:.82rem;
+}
+.tag-dropdown-item{
+  padding:6px 10px;cursor:pointer;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.tag-dropdown-item:hover{background:#f0f4ff;}
+.tag-dropdown-item.selected{color:#9aa0a6;cursor:default;}
+.tag-selector-wrap{position:relative;}
+
 /* ---- Print styles ---- */
 @media print{
   body{background:#fff;padding:0;}
@@ -474,10 +519,24 @@ td.num,td:first-child{word-break:normal;overflow-wrap:normal;}
       <select id="partySelect"><option value="">— All —</option></select>
     </div>
     <div class="controls-group" id="combinedPartyRow" style="display:none;">
-      <label>Customer</label>
-      <select id="combinedCustomerSelect"><option value="">— Select Customer —</option></select>
-      <label>Supplier</label>
-      <select id="combinedSupplierSelect"><option value="">— Select Supplier —</option></select>
+      <div class="tag-selector">
+        <div class="tag-selector-label">Customers</div>
+        <div class="tag-selector-wrap">
+          <div class="tag-input-wrap" id="customerTagWrap">
+            <input type="text" class="tag-search" id="customerTagSearch" placeholder="Add customer…" autocomplete="off" />
+          </div>
+          <div class="tag-dropdown" id="customerTagDropdown" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="tag-selector">
+        <div class="tag-selector-label">Suppliers</div>
+        <div class="tag-selector-wrap">
+          <div class="tag-input-wrap" id="supplierTagWrap">
+            <input type="text" class="tag-search" id="supplierTagSearch" placeholder="Add supplier…" autocomplete="off" />
+          </div>
+          <div class="tag-dropdown" id="supplierTagDropdown" style="display:none;"></div>
+        </div>
+      </div>
     </div>
     <div class="controls-group">
       <label>Period</label>
@@ -727,7 +786,13 @@ let activePartyKey = '';
 let currentMode = 'customer';
 let isBatchMode = false;
 let isCombinedMode = false;
-let combinedKeys = { customerKey: null, supplierKey: null };
+let combinedKeys = { customerKeys: [], supplierKeys: [] };
+
+// Tag selector state
+const tagState = {
+  customer: [], // array of { key, name }
+  supplier: []
+};
 
 let currencyCache = {}; // partyKey -> currency object
 let currencyInfoByUuid = {}; // currencyKey -> currency object (including base)
@@ -736,8 +801,12 @@ let bankCurrencyMap = {};
 let exchangeRateMap = {};
 
 function roundToCurrencyDp(amount, decimals) {
+  // Add a tiny epsilon before rounding to correct IEEE 754 floating point noise.
+  // e.g. 50*45.2991 = 2264.9549999...9272 in float, but mathematically = 2264.955
+  // epsilon=1e-9 is large enough to fix ~1e-14 noise, small enough to never
+  // affect a genuine .4999... value (which would need to be off by >0.001 to matter).
   const factor = Math.pow(10, decimals);
-  return Math.round(amount * factor) / factor;
+  return Math.round((amount + 1e-9) * factor) / factor;
 }
 
 function dateOnly(dateStr) {
@@ -771,7 +840,27 @@ function formatMoneyFor(amount, cur) {
   if (amount === undefined || amount === null) return '';
   const num = parseFloat(amount);
   if (isNaN(num)) return '';
-  return (cur.symbol || '$') + formatNumberDp(num, cur.decimals === undefined ? 2 : cur.decimals);
+  const symbol = cur.symbol || '';
+  return symbol + formatNumberDp(num, cur.decimals === undefined ? 2 : cur.decimals);
+}
+function formatRaw(amount) {
+  // Format a number showing its natural decimal places (no currency rounding).
+  // Used for qty and unit price display.
+  if (amount === undefined || amount === null || isNaN(amount)) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  const s = num.toString();
+  const parts = s.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.length === 2 ? parts[0] + '.' + parts[1] : parts[0];
+}
+function formatRawMoney(amount, cur) {
+  // Like formatMoneyFor but preserves natural decimal places for unit price display.
+  if (amount === undefined || amount === null) return '';
+  const num = parseFloat(amount);
+  if (isNaN(num)) return '';
+  const symbol = cur.symbol || '';
+  return symbol + formatRaw(num);
 }
 function formatSignedFor(amount, cur) {
   if (amount === undefined || amount === null) return '';
@@ -809,7 +898,7 @@ async function ensureBaseCurrency() {
   const base = await safeFetch('base currency', () => getBaseCurrency(), null);
   const currencyData = (base && base.items && base.items.length > 0) ? base.items[0] : base;
   baseCurrencyInfo = {
-    symbol: (currencyData && (currencyData.prefix || currencyData.displayPrefix)) || '$',
+    symbol: (currencyData && (currencyData.prefix || currencyData.displayPrefix)) || '',
     decimals: (currencyData && currencyData.decimalPlaces !== undefined && currencyData.decimalPlaces !== null) ? currencyData.decimalPlaces : 2,
     code: (currencyData && (currencyData.code || currencyData.displayCode)) || 'USD',
     key: 'BASE'
@@ -827,7 +916,7 @@ async function ensureBankCurrencies(bankCurrencyMap) {
     const c = it.item || it;
     if (c.key) {
       currencyInfoByUuid[c.key] = {
-        symbol: c.prefix || c.displayPrefix || '$',
+        symbol: c.prefix || c.displayPrefix || '',
         decimals: (c.decimalPlaces !== undefined && c.decimalPlaces !== null) ? c.decimalPlaces : 2,
         code: c.code || c.displayCode || 'USD',
         key: c.key
@@ -854,7 +943,7 @@ async function ensureCurrencyForParties(partyKeys) {
       const c = it.item || it;
       if (c.key) {
         const info = {
-          symbol: c.prefix || c.displayPrefix || '$',
+          symbol: c.prefix || c.displayPrefix || '',
           decimals: (c.decimalPlaces !== undefined && c.decimalPlaces !== null) ? c.decimalPlaces : 2,
           code: c.code || c.displayCode || 'USD',
           key: c.key
@@ -1039,16 +1128,36 @@ function buildTaxCodeMap(taxCodes) {
   for (const entry of taxCodes) {
     const tc = entry.item || entry;
     if (!tc.key) continue;
-    const displayName = tc.label || tc.name || tc.code || 'Tax';
-    const components = [];
-    if (tc.components && tc.components.length > 0) {
-      for (const comp of tc.components) {
-        const rate = parseFloat(comp.componentRate) || 0;
-        if (rate !== 0) components.push({ name: comp.name || 'Tax', rate });
+    const taxRate = tc.taxRate ?? 2; // 0=Zero, 1=Pass-through, 2=Custom
+    const taxType = tc.type ?? 0;   // 0=Single, 1=Multiple components
+    const codeName = tc.label || tc.name || 'Tax';
+
+    if (taxRate === 0) {
+      // Zero rated — no tax
+      map[tc.key] = { taxRate: 0, rate: 0, components: [], displayName: codeName };
+    } else if (taxRate === 1) {
+      // Pass-through — line amount IS the tax (100%)
+      map[tc.key] = { taxRate: 1, rate: 100, components: [], displayName: codeName };
+    } else {
+      // Custom (taxRate=2)
+      if (taxType === 0) {
+        // Single rate
+        const rate = parseFloat(tc.rate) || 0;
+        map[tc.key] = { taxRate: 2, taxType: 0, rate, components: [], displayName: codeName };
+      } else {
+        // Multiple components
+        const components = [];
+        if (tc.components && tc.components.length > 0) {
+          for (const comp of tc.components) {
+            const rate = parseFloat(comp.componentRate) || 0;
+            const name = comp.name || codeName;
+            components.push({ name, rate });
+          }
+        }
+        const effectiveRate = components.reduce((sum, c) => sum + c.rate, 0);
+        map[tc.key] = { taxRate: 2, taxType: 1, rate: effectiveRate, components, displayName: codeName };
       }
     }
-    const effectiveRate = components.length > 0 ? components.reduce((sum, c) => sum + c.rate, 0) : (parseFloat(tc.rate) || 0);
-    map[tc.key] = { displayName, rate: effectiveRate, components };
   }
   return map;
 }
@@ -1065,8 +1174,52 @@ function buildInvoiceMap(invoices) {
   return { map, partyMap };
 }
 
-// ================================================================
-// 6. INDEXING FUNCTIONS
+function computeTaxDisplay(tc, basePreTax, amountsIncludeTax, dp, cur) {
+  // taxRate=0: Zero — no tax
+  if (tc.taxRate === 0) {
+    return { baseAmount: basePreTax, taxAmount: 0, total: basePreTax, taxDisplay: null };
+  }
+
+  // taxRate=1: Pass-through — line amount IS the tax
+  if (tc.taxRate === 1) {
+    const taxDisplay = `Tax (${tc.displayName}=${formatMoneyFor(basePreTax, cur)})`;
+    return { baseAmount: 0, taxAmount: basePreTax, total: basePreTax, taxDisplay };
+  }
+
+  // taxRate=2: Custom
+  if (tc.rate === 0) {
+    // Rate is zero — no tax effect
+    return { baseAmount: basePreTax, taxAmount: 0, total: basePreTax, taxDisplay: null };
+  }
+
+  let baseAmount, taxAmount, total;
+  const rate = tc.rate / 100;
+
+  if (amountsIncludeTax) {
+    baseAmount = roundToCurrencyDp(basePreTax / (1 + rate), dp);
+    taxAmount = roundToCurrencyDp(basePreTax - baseAmount, dp);
+    total = basePreTax;
+  } else {
+    baseAmount = basePreTax;
+    taxAmount = roundToCurrencyDp(baseAmount * rate, dp);
+    total = roundToCurrencyDp(baseAmount + taxAmount, dp);
+  }
+
+  let taxDisplay;
+  if (tc.taxType === 1 && tc.components.length > 0) {
+    // Multiple components
+    const parts = tc.components.map(c => {
+      const compAmt = roundToCurrencyDp(baseAmount * (c.rate / 100), dp);
+      return `${c.name}=${formatMoneyFor(compAmt, cur)}`;
+    });
+    taxDisplay = `Tax (${parts.join(', ')})`;
+  } else {
+    // Single rate
+    taxDisplay = `Tax (${tc.displayName}=${formatMoneyFor(taxAmount, cur)})`;
+  }
+
+  return { baseAmount, taxAmount, total, taxDisplay };
+}
 // ================================================================
 function indexByTopLevelParty(items, headerField) {
   const map = new Map();
@@ -1092,13 +1245,16 @@ function indexJournalsByParty(journals, linePartyField, controlAccountKeys, invo
     for (const line of lines) {
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
-      // Resolve party: invoice ref → line field
+      // Resolve party: invoice ref (with confirmation) → line field
+      const lineFieldVal = line[lineField] || null;
       let partyKey = null;
       const invKey = line[invoiceRefField];
-      if (invKey && invoicePartyMap[invKey]) {
+      // Priority 1: invoice-driven — only if line-level field is also non-null
+      if (invKey && invoicePartyMap[invKey] && lineFieldVal) {
         partyKey = invoicePartyMap[invKey][invPartyField] || null;
       }
-      if (!partyKey) partyKey = line[lineField] || null;
+      // Priority 2: line-level field
+      if (!partyKey) partyKey = lineFieldVal;
       if (partyKey) parties.add(partyKey);
     }
     for (const p of parties) {
@@ -1125,17 +1281,19 @@ function indexCashDocsByParty(docs, controlAccountKeys, linePartyField, payeeVal
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
       let partyKey = null;
-      // Invoice-driven lookup takes highest priority
+      // Priority 1: invoice-driven — only if confirmation field is non-null
       const invKey = line[invoiceRefField];
-      if (invKey && invoicePartyMap && invoicePartyMap[invKey]) {
+      const linePartyVal = line[lineField] || null;
+      const confirmField = (paidBy === payeeValue) ? headerParty : linePartyVal;
+      if (invKey && invoicePartyMap && invoicePartyMap[invKey] && confirmField) {
         partyKey = invoicePartyMap[invKey][invPartyField] || null;
       }
-      // Doc-level party (paidBy=1 for customer, paidBy=2 for supplier)
+      // Priority 2: doc-level party (paidBy matches payeeValue and header non-null)
       if (!partyKey && paidBy === payeeValue && headerParty) {
         partyKey = headerParty;
       }
-      // Line-level field
-      if (!partyKey) partyKey = line[lineField] || null;
+      // Priority 3: line-level field (also covers paidBy=1 with null header fallback)
+      if (!partyKey) partyKey = linePartyVal;
       if (partyKey) partiesForDoc.add(partyKey);
     }
     for (const p of partiesForDoc) {
@@ -1188,29 +1346,11 @@ function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxC
       const basePreTax = roundToCurrencyDp(computeLineAmount(line, priceField, discountEnabled, discountType), dp);
       let taxAmount = 0, taxDisplay = null, total = 0, baseAmount = basePreTax;
 
-      if (amountsIncludeTax) {
-        const totalIncl = basePreTax;
-        if (line.taxCode && taxCodeMap[line.taxCode]) {
-          const tc = taxCodeMap[line.taxCode];
-          const rate = tc.rate / 100;
-          const base = roundToCurrencyDp(totalIncl / (1 + rate), dp);
-          const tax = roundToCurrencyDp(totalIncl - base, dp);
-          baseAmount = base; taxAmount = tax; total = totalIncl;
-          taxDisplay = tc.components.length > 0
-            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(base * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
-            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
-        } else { total = totalIncl; baseAmount = totalIncl; }
+      if (line.taxCode && taxCodeMap[line.taxCode]) {
+        const r = computeTaxDisplay(taxCodeMap[line.taxCode], basePreTax, amountsIncludeTax, dp, currencyFor(partyKey));
+        baseAmount = r.baseAmount; taxAmount = r.taxAmount; total = r.total; taxDisplay = r.taxDisplay;
       } else {
-        baseAmount = basePreTax;
-        if (line.taxCode && taxCodeMap[line.taxCode]) {
-          const tc = taxCodeMap[line.taxCode];
-          const rate = tc.rate / 100;
-          const tax = roundToCurrencyDp(baseAmount * rate, dp);
-          taxAmount = tax; total = roundToCurrencyDp(baseAmount + tax, dp);
-          taxDisplay = tc.components.length > 0
-            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(baseAmount * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
-            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
-        } else { total = baseAmount; }
+        total = basePreTax;
       }
 
       sumTotal = roundToCurrencyDp(sumTotal + total, dp);
@@ -1229,23 +1369,8 @@ function extractInvoiceLines(invoices, partyKey, mode, itemMap, accountMap, taxC
           const basePreTax = roundToCurrencyDp(amount, dp);
           let taxAmount = 0, taxDisplay = null, total = basePreTax, baseAmount = basePreTax;
           if (lc.landedCostTaxCode && taxCodeMap[lc.landedCostTaxCode]) {
-            const tc = taxCodeMap[lc.landedCostTaxCode];
-            if (amountsIncludeTax) {
-              const rate = tc.rate / 100;
-              const base = roundToCurrencyDp(basePreTax / (1 + rate), dp);
-              const tax = roundToCurrencyDp(basePreTax - base, dp);
-              baseAmount = base; taxAmount = tax; total = basePreTax;
-              taxDisplay = tc.components.length > 0
-                ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(base * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
-                : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
-            } else {
-              const rate = tc.rate / 100;
-              const tax = roundToCurrencyDp(basePreTax * rate, dp);
-              taxAmount = tax; total = roundToCurrencyDp(basePreTax + tax, dp);
-              taxDisplay = tc.components.length > 0
-                ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(basePreTax * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
-                : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
-            }
+            const r = computeTaxDisplay(taxCodeMap[lc.landedCostTaxCode], basePreTax, amountsIncludeTax, dp, currencyFor(partyKey));
+            baseAmount = r.baseAmount; taxAmount = r.taxAmount; total = r.total; taxDisplay = r.taxDisplay;
           }
           sumTotal = roundToCurrencyDp(sumTotal + total, dp);
           details.push({
@@ -1385,29 +1510,11 @@ function extractCreditNotes(creditNotes, partyKey, mode, itemMap, accountMap, ta
       const basePreTax = roundToCurrencyDp(computeLineAmount(line, priceField, discountEnabled, discountType), dp);
       let taxAmount = 0, taxDisplay = null, total = 0, baseAmount = basePreTax;
 
-      if (amountsIncludeTax) {
-        const totalIncl = basePreTax;
-        if (line.taxCode && taxCodeMap[line.taxCode]) {
-          const tc = taxCodeMap[line.taxCode];
-          const rate = tc.rate / 100;
-          const base = roundToCurrencyDp(totalIncl / (1 + rate), dp);
-          const tax = roundToCurrencyDp(totalIncl - base, dp);
-          baseAmount = base; taxAmount = tax; total = totalIncl;
-          taxDisplay = tc.components.length > 0
-            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(base * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
-            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
-        } else { total = totalIncl; baseAmount = totalIncl; }
+      if (line.taxCode && taxCodeMap[line.taxCode]) {
+        const r = computeTaxDisplay(taxCodeMap[line.taxCode], basePreTax, amountsIncludeTax, dp, currencyFor(partyKey));
+        baseAmount = r.baseAmount; taxAmount = r.taxAmount; total = r.total; taxDisplay = r.taxDisplay;
       } else {
-        baseAmount = basePreTax;
-        if (line.taxCode && taxCodeMap[line.taxCode]) {
-          const tc = taxCodeMap[line.taxCode];
-          const rate = tc.rate / 100;
-          const tax = roundToCurrencyDp(baseAmount * rate, dp);
-          taxAmount = tax; total = roundToCurrencyDp(baseAmount + tax, dp);
-          taxDisplay = tc.components.length > 0
-            ? `Tax (${tc.components.map(c => `${c.name}=${formatMoneyFor(roundToCurrencyDp(baseAmount * (c.rate / 100), dp), currencyFor(partyKey))}`).join(', ')})`
-            : `Tax (${tc.displayName}=${formatMoneyFor(tax, currencyFor(partyKey))})`;
-        } else { total = baseAmount; }
+        total = basePreTax;
       }
 
       sumTotal = roundToCurrencyDp(sumTotal + total, dp);
@@ -1503,18 +1610,20 @@ function extractReceipts(receipts, partyKey, mode, controlAccountKeys, accountMa
     for (const line of lines) {
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
-      // Priority 1: invoice-driven party
+      // Priority 1: invoice-driven — only if confirmation field is non-null
       let lineParty = null;
       const invKey = line[invoiceRefField];
-      if (invKey && invoicePartyMap[invKey]) {
+      const lineFieldVal = line[lineField] || null;
+      const confirmVal = (paidBy === payeeValue) ? headerParty : lineFieldVal;
+      if (invKey && invoicePartyMap[invKey] && confirmVal) {
         lineParty = invoicePartyMap[invKey][invPartyField] || null;
       }
-      // Priority 2: doc-level party (paidBy=1 for customer, paidBy=2 for supplier)
+      // Priority 2: doc-level party (paidBy=1/2 with non-null header)
       if (!lineParty && paidBy === payeeValue && headerParty) {
         lineParty = headerParty;
       }
-      // Priority 3: line-level field
-      if (!lineParty) lineParty = line[lineField] || null;
+      // Priority 3: line-level field (fallback, including paidBy=1 with null header)
+      if (!lineParty) lineParty = lineFieldVal;
       if (lineParty === partyKey) relevantLines.push(line);
     }
     if (relevantLines.length === 0) continue;
@@ -1633,18 +1742,20 @@ function extractPayments(payments, partyKey, mode, controlAccountKeys, accountMa
     for (const line of lines) {
       if (line.item != null && line.item !== '') continue;
       if (!(line.account && controlAccountKeys.includes(line.account))) continue;
-      // Priority 1: invoice-driven party
+      // Priority 1: invoice-driven — only if confirmation field is non-null
       let lineParty = null;
       const invKey = line[invoiceRefField];
-      if (invKey && invoicePartyMap[invKey]) {
+      const lineFieldVal = line[lineField] || null;
+      const confirmVal = (paidBy === payeeValue) ? headerParty : lineFieldVal;
+      if (invKey && invoicePartyMap[invKey] && confirmVal) {
         lineParty = invoicePartyMap[invKey][invPartyField] || null;
       }
-      // Priority 2: doc-level party (payee=1 for customer, payee=2 for supplier)
+      // Priority 2: doc-level party (paidBy=1/2 with non-null header)
       if (!lineParty && paidBy === payeeValue && headerParty) {
         lineParty = headerParty;
       }
-      // Priority 3: line-level field
-      if (!lineParty) lineParty = line[lineField] || null;
+      // Priority 3: line-level field (fallback, including paidBy=1 with null header)
+      if (!lineParty) lineParty = lineFieldVal;
       if (lineParty === partyKey) relevantLines.push(line);
     }
     if (relevantLines.length === 0) continue;
@@ -1751,13 +1862,15 @@ function extractJournalEntries(journals, partyKey, mode, controlAccountKeys, acc
     const relevantLines = lines.filter(line => {
       if (line.item != null && line.item !== '') return false;
       if (!(line.account && controlAccountKeys.includes(line.account))) return false;
-      // Resolve party
+      // Priority 1: invoice-driven — only if line-level field is also non-null (confirmation)
+      const lineFieldVal = line[lineField] || null;
       let resolvedParty = null;
       const invKey = line[invoiceRefField];
-      if (invKey && invoicePartyMap[invKey]) {
+      if (invKey && invoicePartyMap[invKey] && lineFieldVal) {
         resolvedParty = invoicePartyMap[invKey][invPartyField] || null;
       }
-      if (!resolvedParty) resolvedParty = line[lineField] || null;
+      // Priority 2: line-level field
+      if (!resolvedParty) resolvedParty = lineFieldVal;
       return resolvedParty === partyKey;
     });
     if (relevantLines.length === 0) continue;
@@ -1958,7 +2071,7 @@ function computeRows(allTransactions, fromDate, toDate, dp) {
   if (transactionsInRange.length > 0) {
     let totalDebits = 0, totalCredits = 0;
     for (const t of transactionsInRange) {
-      if (t.isDebit) totalDebits = roundToCurrencyDp(totalDebits + t.amount, dp);
+      if (t.isDebit) totalDebits = roundToCurrencyDp(totalDebits + Math.abs(t.amount), dp);
       if (t.isCredit) totalCredits = roundToCurrencyDp(totalCredits + Math.abs(t.amount), dp);
     }
     rows.push({ type: 'total', debits: totalDebits, credits: totalCredits, runningBalance: balance });
@@ -2104,9 +2217,9 @@ function buildStatementHTML(displayRows, transactions, openingBalance, party, fr
       if (desc) parts.push(desc);
 
       if (d.qty !== null && d.qty !== 0) {
-        let qtyStr = formatNumberDp(Math.abs(d.qty), cur.decimals);
+        let qtyStr = formatRaw(Math.abs(d.qty));
         if (d.unitName) qtyStr += ` ${d.unitName}`;
-        if (d.price > 0) qtyStr += ` @ ${formatMoneyFor(d.price, cur)}`;
+        if (d.price > 0) qtyStr += ` @ ${formatRawMoney(d.price, cur)}`;
         parts.push(qtyStr);
       }
       if (d.discountText) parts.push(d.discountText);
@@ -2216,9 +2329,9 @@ function exportCSV(displayRows, fromDate, toDate, cur) {
       const parts = [];
       if (d.description) parts.push(d.description);
       if (d.qty !== null && d.qty !== 0) {
-        let qtyStr = formatNumberDp(d.qty, cur.decimals);
+        let qtyStr = formatRaw(d.qty);
         if (d.unitName) qtyStr += ` ${d.unitName}`;
-        if (d.price > 0) qtyStr += ` @ ${formatMoneyFor(d.price, cur)}`;
+        if (d.price > 0) qtyStr += ` @ ${formatRawMoney(d.price, cur)}`;
         parts.push(qtyStr);
       }
       if (d.discountText) parts.push(d.discountText);
@@ -2352,7 +2465,7 @@ function showDashboard() {
   activePartyKey = '';
   isBatchMode = false;
   if (!isCombinedMode) {
-    combinedKeys = { customerKey: null, supplierKey: null };
+    combinedKeys = { customerKeys: [], supplierKeys: [] }; tagState.customer = []; tagState.supplier = [];
   }
   document.getElementById('partySelect').value = '';
   document.getElementById('backToDashboard').style.display = 'none';
@@ -2378,10 +2491,10 @@ function showStatement(partyKey, batchMode = false) {
 }
 async function runActiveView() {
   if (isCombinedMode) {
-    const customerKey = combinedKeys.customerKey || document.getElementById('combinedCustomerSelect').value;
-    const supplierKey = combinedKeys.supplierKey || document.getElementById('combinedSupplierSelect').value;
-    if (customerKey && supplierKey) {
-      await generateCombinedStatement(customerKey, supplierKey);
+    const customerKeys = combinedKeys.customerKeys.length > 0 ? combinedKeys.customerKeys : tagState.customer.map(p => p.key);
+    const supplierKeys = combinedKeys.supplierKeys.length > 0 ? combinedKeys.supplierKeys : tagState.supplier.map(p => p.key);
+    if (customerKeys.length > 0 || supplierKeys.length > 0) {
+      await generateCombinedStatement(customerKeys, supplierKeys);
     }
   } else if (activePartyKey && !isBatchMode) {
     await generateStatement(activePartyKey);
@@ -2895,7 +3008,7 @@ async function generateStatement(partyKey) {
         const c = it.item || it;
         if (c.key) {
           currencyInfoByUuid[c.key] = {
-            symbol: c.prefix || c.displayPrefix || '$',
+            symbol: c.prefix || c.displayPrefix || '',
             decimals: (c.decimalPlaces !== undefined && c.decimalPlaces !== null) ? c.decimalPlaces : 2,
             code: c.code || c.displayCode || 'USD',
             key: c.key
@@ -3030,7 +3143,6 @@ let allCustomers = [];
 let allSuppliers = [];
 
 async function populateCombinedModal() {
-  // Fetch both party lists if cleared (e.g. after refresh)
   if (allCustomers.length === 0) {
     const items = await safeFetch('customers', () => fetchAllPages('/api4/customer-batch'), []);
     allCustomers = items.map(e => e.item || e).filter(p => p.key && !p.inactive);
@@ -3041,105 +3153,174 @@ async function populateCombinedModal() {
     allSuppliers = items.map(e => e.item || e).filter(p => p.key && !p.inactive);
     allSuppliers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
-
-  // Rebuild the inline dropdowns in the toolbar
-  const custSel = document.getElementById('combinedCustomerSelect');
-  const suppSel = document.getElementById('combinedSupplierSelect');
-  const prevCust = custSel.value;
-  const prevSupp = suppSel.value;
-  custSel.innerHTML = '<option value="">— Select Customer —</option>';
-  suppSel.innerHTML = '<option value="">— Select Supplier —</option>';
-  for (const p of allCustomers) {
-    const opt = document.createElement('option');
-    opt.value = p.key;
-    opt.textContent = p.nameWithCode || p.name || p.code || 'Unnamed';
-    custSel.appendChild(opt);
-  }
-  for (const p of allSuppliers) {
-    const opt = document.createElement('option');
-    opt.value = p.key;
-    opt.textContent = p.nameWithCode || p.name || p.code || 'Unnamed';
-    suppSel.appendChild(opt);
-  }
-  // Restore previous selection if still valid
-  if (prevCust) custSel.value = prevCust;
-  if (prevSupp) suppSel.value = prevSupp;
+  renderTagChips('customer');
+  renderTagChips('supplier');
+  initTagSelectors();
 }
 
-async function generateCombinedStatement(customerKey, supplierKey) {
+function renderTagChips(side) {
+  const wrap = document.getElementById(side === 'customer' ? 'customerTagWrap' : 'supplierTagWrap');
+  const search = document.getElementById(side === 'customer' ? 'customerTagSearch' : 'supplierTagSearch');
+  wrap.querySelectorAll('.tag-chip').forEach(c => c.remove());
+  for (const p of tagState[side]) {
+    const chip = document.createElement('div');
+    chip.className = 'tag-chip' + (side === 'supplier' ? ' supplier-chip' : '');
+    chip.dataset.key = p.key;
+    chip.innerHTML = `<span title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span><button type="button" aria-label="Remove">&#x2715;</button>`;
+    chip.querySelector('button').addEventListener('click', () => {
+      tagState[side] = tagState[side].filter(x => x.key !== p.key);
+      renderTagChips(side);
+    });
+    wrap.insertBefore(chip, search);
+  }
+}
+
+function setupTagSelector(side, list) {
+  const search = document.getElementById(side === 'customer' ? 'customerTagSearch' : 'supplierTagSearch');
+  const dropdown = document.getElementById(side === 'customer' ? 'customerTagDropdown' : 'supplierTagDropdown');
+  const wrap = document.getElementById(side === 'customer' ? 'customerTagWrap' : 'supplierTagWrap');
+  // Remove old listeners by cloning
+  const newSearch = search.cloneNode(true);
+  search.parentNode.replaceChild(newSearch, search);
+
+  function showDropdown(filter) {
+    const selected = new Set(tagState[side].map(p => p.key));
+    const items = list.filter(p => {
+      const name = (p.nameWithCode || p.name || '').toLowerCase();
+      return !filter || name.includes(filter.toLowerCase());
+    });
+    if (items.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = '';
+    items.slice(0, 80).forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'tag-dropdown-item' + (selected.has(p.key) ? ' selected' : '');
+      div.textContent = p.nameWithCode || p.name || 'Unnamed';
+      if (!selected.has(p.key)) {
+        div.addEventListener('mousedown', e => {
+          e.preventDefault();
+          tagState[side].push({ key: p.key, name: p.nameWithCode || p.name || 'Unnamed' });
+          renderTagChips(side);
+          newSearch.value = '';
+          dropdown.style.display = 'none';
+          newSearch.focus();
+        });
+      }
+      dropdown.appendChild(div);
+    });
+    const cardEl = document.querySelector('.statement-card');
+    const rect = wrap.getBoundingClientRect();
+    const cardRect = cardEl.getBoundingClientRect();
+    dropdown.style.top = (rect.bottom - cardRect.top + 2) + 'px';
+    dropdown.style.left = (rect.left - cardRect.left) + 'px';
+    dropdown.style.width = rect.width + 'px';
+    dropdown.style.display = '';
+  }
+
+  newSearch.addEventListener('focus', () => showDropdown(newSearch.value));
+  newSearch.addEventListener('input', () => showDropdown(newSearch.value));
+  newSearch.addEventListener('blur', () => setTimeout(() => { dropdown.style.display = 'none'; }, 150));
+  wrap.addEventListener('click', () => newSearch.focus());
+}
+
+function initTagSelectors() {
+  setupTagSelector('customer', allCustomers);
+  setupTagSelector('supplier', allSuppliers);
+}
+
+async function generateCombinedStatement(customerKeys, supplierKeys) {
+  // Accept arrays of party keys
+  const allPartyKeys = [...customerKeys, ...supplierKeys];
+  if (allPartyKeys.length === 0) { showError('Please select at least one party.'); return; }
+
   let fromDate = document.getElementById('fromDate').value;
   const toDate = document.getElementById('toDate').value;
   if (!fromDate || !toDate) { showError('Please select both dates.'); return; }
 
-  const showCombinedError = (msg) => showError(msg);
   permissionFailures.clear();
-
-
 
   try {
     await fetchDateFormat();
     await ensureBaseCurrency();
 
-    // Fetch both modes' transactional data
+    const needsCust = customerKeys.length > 0;
+    const needsSupp = supplierKeys.length > 0;
+
+    // Fetch transactional data for needed modes
     const [custTd, suppTd] = await Promise.all([
-      getTransactionalDataForMode('customer'),
-      getTransactionalDataForMode('supplier')
+      needsCust ? getTransactionalDataForMode('customer') : Promise.resolve(null),
+      needsSupp ? getTransactionalDataForMode('supplier') : Promise.resolve(null)
     ]);
 
-    // Ensure currency info loaded for both parties before currency check
-    await ensureCurrencyForParties([customerKey, supplierKey]);
-    await ensureBankCurrencies({ ...custTd.refs.bankCurrencyMap, ...suppTd.refs.bankCurrencyMap });
+    const bankMaps = {};
+    if (custTd) Object.assign(bankMaps, custTd.refs.bankCurrencyMap);
+    if (suppTd) Object.assign(bankMaps, suppTd.refs.bankCurrencyMap);
 
-    // Currency check
-    const custCur = currencyFor(customerKey);
-    const suppCur = currencyFor(supplierKey);
-    if (custCur.key !== suppCur.key) {
-      showCombinedError(`Currency mismatch: Customer is ${custCur.code}, Supplier is ${suppCur.code}. Combined statements require matching currencies.`);
+    // Ensure currency info loaded
+    await ensureCurrencyForParties(allPartyKeys);
+    await ensureBankCurrencies(bankMaps);
+
+    // Currency check — all parties must share the same currency
+    const currencies = allPartyKeys.map(k => currencyFor(k));
+    const refCur = currencies[0];
+    const mismatch = currencies.find(c => c.key !== refCur.key);
+    if (mismatch) {
+      showError(`Currency mismatch: all selected parties must share the same currency.`);
       return;
     }
 
-    // Ensure party lists are populated (may have been cleared by refresh)
+    // Ensure party lists loaded (for name lookup)
     await populateCombinedModal();
-    const custParty = allCustomers.find(p => p.key === customerKey);
-    const suppParty = allSuppliers.find(p => p.key === supplierKey);
-    if (!custParty || !suppParty) { showCombinedError('Party not found.'); return; }
 
-    // Set global exchange rate map from both modes merged
-    exchangeRateMap = { ...custTd.refs.exchangeRateMap, ...suppTd.refs.exchangeRateMap };
+    // Build party objects for summary
+    const custParties = customerKeys.map(k => allCustomers.find(p => p.key === k)).filter(Boolean);
+    const suppParties = supplierKeys.map(k => allSuppliers.find(p => p.key === k)).filter(Boolean);
 
-    // Collect transactions for each party
+    // Merged exchange rate map
+    exchangeRateMap = {};
+    if (custTd) Object.assign(exchangeRateMap, custTd.refs.exchangeRateMap);
+    if (suppTd) Object.assign(exchangeRateMap, suppTd.refs.exchangeRateMap);
+
     warnings = { undated: false, controlDegraded: false, zeroLineDocs: false, currencyMismatch: false };
     const baseCurKey = baseCurrencyInfo ? baseCurrencyInfo.key : null;
-    const { allTransactions: custRaw } = collectAllTransactions(customerKey, custTd.idx, 'customer', custTd.refs, custTd.invoiceMap, custTd.invoicePartyMap || {}, custTd.refs.bankCurrencyMap, baseCurKey);
-    const { allTransactions: suppRaw } = collectAllTransactions(supplierKey, suppTd.idx, 'supplier', suppTd.refs, suppTd.invoiceMap, suppTd.invoicePartyMap || {}, suppTd.refs.bankCurrencyMap, baseCurKey);
+    const dp = refCur.decimals === undefined ? 2 : refCur.decimals;
 
-    // Tag source; override displayType for badge disambiguation in combined view
-    for (const t of custRaw) {
-      t._source = 'customer';
-      if (t.type === 'Invoice') t.displayType = 'Sale Invoice';
+    // Collect transactions for all parties
+    const allTransactions = [];
+    if (custTd) {
+      for (const key of customerKeys) {
+        const { allTransactions: raw } = collectAllTransactions(key, custTd.idx, 'customer', custTd.refs, custTd.invoiceMap, custTd.invoicePartyMap || {}, custTd.refs.bankCurrencyMap, baseCurKey);
+        for (const t of raw) {
+          t._source = 'customer';
+          if (t.type === 'Invoice') t.displayType = 'Sale Invoice';
+          t._partyKey = key;
+        }
+        allTransactions.push(...raw);
+      }
     }
-    for (const t of suppRaw) {
-      t._source = 'supplier';
-      if (t.type === 'Purchase Invoice') t.displayType = 'Purchase Invoice';
-      if (t.type === 'Debit Note') t.displayType = 'Debit Note';
+    if (suppTd) {
+      for (const key of supplierKeys) {
+        const { allTransactions: raw } = collectAllTransactions(key, suppTd.idx, 'supplier', suppTd.refs, suppTd.invoiceMap, suppTd.invoicePartyMap || {}, suppTd.refs.bankCurrencyMap, baseCurKey);
+        for (const t of raw) {
+          t._source = 'supplier';
+          if (t.type === 'Purchase Invoice') t.displayType = 'Purchase Invoice';
+          if (t.type === 'Debit Note') t.displayType = 'Debit Note';
+          t._partyKey = key;
+        }
+        allTransactions.push(...raw);
+      }
     }
 
-    const allTransactions = [...custRaw, ...suppRaw];
-    const dp = custCur.decimals === undefined ? 2 : custCur.decimals;
-
-    // Sort merged list by date → type priority → timestamp → ref
+    // Sort by date → type priority → timestamp → ref
     allTransactions.sort((a, b) => {
-      const da = a.date || '';
-      const db = b.date || '';
+      const da = a.date || '', db = b.date || '';
       if (da !== db) return da.localeCompare(db);
-      const ap = TYPE_PRIORITY[a.type] || 99;
-      const bp = TYPE_PRIORITY[b.type] || 99;
+      const ap = TYPE_PRIORITY[a.type] || 99, bp = TYPE_PRIORITY[b.type] || 99;
       if (ap !== bp) return ap - bp;
       if (a.timestamp && b.timestamp && a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
       return (a.reference || '').localeCompare(b.reference || '');
     });
 
-    // Handle from-start: find earliest transaction date across both parties
+    // From-start: find earliest date across all parties
     if (document.getElementById('rangePreset').value === 'from-start') {
       const allDates = [...new Set(allTransactions.filter(t => t.date).map(t => dateOnly(t.date)))];
       const earliest = allDates.length > 0 ? allDates.reduce((a, b) => (a < b ? a : b)) : fromDate;
@@ -3147,28 +3328,24 @@ async function generateCombinedStatement(customerKey, supplierKey) {
       document.getElementById('fromDate').value = earliest;
     }
 
-    // computeRows handles opening balance and period filtering internally
     const { rows, transactions: periodTransactions, openingBalance } = computeRows(allTransactions, fromDate, toDate, dp);
 
-
-
-    const content = document.getElementById('statementContent');
-    const html = buildCombinedStatementHTML(rows, periodTransactions, openingBalance, custParty, suppParty, fromDate, toDate, warnings, custCur, custTd.refs.businessDetails);
-    content.innerHTML = html;
+    const contentEl = document.getElementById('statementContent');
+    const html = buildCombinedStatementHTML(rows, periodTransactions, openingBalance, custParties, suppParties, fromDate, toDate, warnings, refCur, (custTd || suppTd).refs.businessDetails);
+    contentEl.innerHTML = html;
 
     currentDisplayRows = rows;
     currentRange = { from: fromDate, to: toDate };
     isCombinedMode = true;
-    combinedKeys = { customerKey, supplierKey };
-    document.title = `Combined Statement - ${custParty.name} / ${suppParty.name}`;
+    combinedKeys = { customerKeys, supplierKeys };
+    const allNames = [...custParties, ...suppParties].map(p => p.name).join(', ');
+    document.title = `Combined Statement - ${allNames}`;
 
     showStatement('', false);
 
   } catch (err) {
-    showCombinedError(`Error: ${err.message || 'Unknown error'}`);
+    showError(`Error: ${err.message || 'Unknown error'}`);
     console.error(err);
-  } finally {
-    // nothing to restore
   }
 }
 
@@ -3212,10 +3389,8 @@ async function getTransactionalDataForMode(mode) {
   return data;
 }
 
-function buildCombinedStatementHTML(displayRows, transactions, openingBalance, custParty, suppParty, fromDate, toDate, warnings, cur, businessDetails) {
+function buildCombinedStatementHTML(displayRows, transactions, openingBalance, custParties, suppParties, fromDate, toDate, warnings, cur, businessDetails) {
   const dp = cur.decimals === undefined ? 2 : cur.decimals;
-  const custName = custParty.nameWithCode || custParty.name;
-  const suppName = suppParty.nameWithCode || suppParty.name;
   const bizName = businessDetails ? (businessDetails.name || '') : '';
   const bizAddress = businessDetails ? (businessDetails.address || '') : '';
 
@@ -3236,6 +3411,26 @@ function buildCombinedStatementHTML(displayRows, transactions, openingBalance, c
     warningHtml += `</div>`;
   }
 
+  // Party block: customer names + supplier names
+  const custBlock = custParties.length > 0 ? `
+    <div>
+      <div class="combined-badge customer">Customer${custParties.length > 1 ? 's' : ''}</div>
+      ${custParties.map(p => `<div class="name">${escapeHtml(p.nameWithCode || p.name)}</div>`).join('')}
+    </div>` : '';
+  const suppBlock = suppParties.length > 0 ? `
+    <div>
+      <div class="combined-badge supplier">Supplier${suppParties.length > 1 ? 's' : ''}</div>
+      ${suppParties.map(p => `<div class="name">${escapeHtml(p.nameWithCode || p.name)}</div>`).join('')}
+    </div>` : '';
+  const periodBlock = `
+    <div style="text-align:right;">
+      <div class="label">Statement Period</div>
+      <div class="name" style="font-size:.9rem;">${formatDate(fromDate)} &ndash; ${formatDate(toDate)}</div>
+    </div>`;
+
+  const cols = [custBlock, suppBlock, periodBlock].filter(Boolean);
+  const partyBlockHtml = `<div class="party-block-combined" style="grid-template-columns:${cols.map(() => '1fr').join(' ')};">${cols.join('')}</div>`;
+
   const headerHtml = `
     <div class="doc-title">
       <div class="doc-meta">
@@ -3248,26 +3443,12 @@ function buildCombinedStatementHTML(displayRows, transactions, openingBalance, c
         ${bizAddress ? `<div class="biz-address">${escapeHtml(bizAddress)}</div>` : ''}
       </div>
     </div>
-    <div class="party-block-combined">
-      <div>
-        <div class="combined-badge customer">Customer</div>
-        <div class="name">${escapeHtml(custName)}</div>
-        ${custParty.billingAddress || custParty.address ? `<div class="address">${escapeHtml(custParty.billingAddress || custParty.address)}</div>` : ''}
-      </div>
-      <div>
-        <div class="combined-badge supplier">Supplier</div>
-        <div class="name">${escapeHtml(suppName)}</div>
-        ${suppParty.address ? `<div class="address">${escapeHtml(suppParty.address)}</div>` : ''}
-      </div>
-      <div style="text-align:right;">
-        <div class="label">Statement Period</div>
-        <div class="name" style="font-size:.9rem;">${formatDate(fromDate)} &ndash; ${formatDate(toDate)}</div>
-      </div>
-    </div>
+    ${partyBlockHtml}
     ${warningHtml}
   `;
 
-  const printHeaderText = `${escapeHtml(custName)} / ${escapeHtml(suppName)} — ${formatDate(fromDate)} to ${formatDate(toDate)}`;
+  const allPartyNames = [...custParties, ...suppParties].map(p => escapeHtml(p.nameWithCode || p.name)).join(' / ');
+  const printHeaderText = `${allPartyNames} — ${formatDate(fromDate)} to ${formatDate(toDate)}`;
 
   let tableHtml = `<div class="table-wrap"><table>
     <thead>
@@ -3318,9 +3499,9 @@ function buildCombinedStatementHTML(displayRows, transactions, openingBalance, c
       else if (isNegative) desc = 'Less: Amount';
       if (desc) parts.push(desc);
       if (d.qty !== null && d.qty !== 0) {
-        let qtyStr = formatNumberDp(Math.abs(d.qty), dp);
+        let qtyStr = formatRaw(Math.abs(d.qty));
         if (d.unitName) qtyStr += ` ${d.unitName}`;
-        if (d.price > 0) qtyStr += ` @ ${formatMoneyFor(d.price, cur)}`;
+        if (d.price > 0) qtyStr += ` @ ${formatRawMoney(d.price, cur)}`;
         parts.push(qtyStr);
       }
       if (d.discountText) parts.push(d.discountText);
@@ -3347,17 +3528,25 @@ function buildCombinedStatementHTML(displayRows, transactions, openingBalance, c
   }
   tableHtml += `</tbody></table></div>`;
 
-  // Summary
-  const summaryItems = [`<span class="item"><strong>Opening:</strong> <strong>${formatBalanceWithDrCrFor(openingBalance, cur)}</strong></span>`];
-  const typeLabels = { 'Invoice':'Sale Invoices','Purchase Invoice':'Purchase Invoices','Credit Note':'Credit Notes','Debit Note':'Debit Notes','Receipt':'Receipts','Payment':'Payments','Journal Entry':'Journal Entries','Withholding Tax':'Withholding Tax','Late Fee':'Late Fees' };
-  const typeSums = {};
-  for (const t of transactions) { typeSums[t.type] = roundToCurrencyDp((typeSums[t.type] || 0) + t.amount, dp); }
-  for (const [type, label] of Object.entries(typeLabels)) {
-    const val = typeSums[type];
-    if (val && val !== 0) summaryItems.push(`<span class="item"><strong>${label}:</strong> <strong>${formatBalanceWithDrCrFor(val, cur)}</strong></span>`);
+  // Summary — party-by-party net, then grand total
+  const combinedPartiesList = [...custParties, ...suppParties];
+  let partyNetHtml = '';
+  if (combinedPartiesList.length > 1) {
+    partyNetHtml = '<div class="summary-line">';
+    for (const p of combinedPartiesList) {
+      const partyTxns = transactions.filter(t => t._partyKey === p.key);
+      let net = openingBalance; // start from opening for this party
+      // Actually compute per-party opening and closing
+      const partyAllTxns = [...displayRows]
+        .filter(r => r.type === 'main' && r.transaction._partyKey === p.key);
+      // Per-party net during period
+      const periodNet = partyTxns.reduce((sum, t) => roundToCurrencyDp(sum + t.amount, dp), 0);
+      partyNetHtml += `<span class="item"><strong>${escapeHtml(p.nameWithCode || p.name)}:</strong> <strong>${formatBalanceWithDrCrFor(periodNet, cur)}</strong></span> `;
+    }
+    partyNetHtml += '</div>';
   }
-  const summaryHtml = `<div class="summary-line">${summaryItems.join(' ')}</div>`;
-  const closingHtml = `<div class="closing-line"><strong>Net Closing Balance: ${formatBalanceWithDrCrFor(lastBalance, cur)}</strong></div>`;
+  const summaryHtml = `<div class="summary-line"><span class="item"><strong>Opening:</strong> <strong>${formatBalanceWithDrCrFor(openingBalance, cur)}</strong></span></div>`;
+  const closingHtml = `${partyNetHtml}<div class="closing-line"><strong>Net Closing Balance: ${formatBalanceWithDrCrFor(lastBalance, cur)}</strong></div>`;
 
   return `<div class="statement-page">${headerHtml}${tableHtml}${summaryHtml}${closingHtml}</div>`;
 }
@@ -3419,7 +3608,7 @@ document.getElementById('modeSelect').addEventListener('change', async function 
   if (mode === 'combined') {
     currentMode = 'customer'; // keep API mode valid
     isCombinedMode = true;
-    combinedKeys = { customerKey: null, supplierKey: null };
+    combinedKeys = { customerKeys: [], supplierKeys: [] }; tagState.customer = []; tagState.supplier = [];
     document.getElementById('partySelect').value = '';
     document.getElementById('partyLabel').style.display = 'none';
     document.getElementById('partySelect').style.display = 'none';
@@ -3432,7 +3621,7 @@ document.getElementById('modeSelect').addEventListener('change', async function 
     showDashboard();
   } else {
     isCombinedMode = false;
-    combinedKeys = { customerKey: null, supplierKey: null };
+    combinedKeys = { customerKeys: [], supplierKeys: [] }; tagState.customer = []; tagState.supplier = [];
     currentMode = mode;
     document.getElementById('partyLabel').style.display = '';
     document.getElementById('partySelect').style.display = '';
@@ -3472,7 +3661,7 @@ document.getElementById('partySelect').addEventListener('change', function () {
 document.getElementById('backToDashboard').addEventListener('click', () => {
   if (isCombinedMode) {
     isCombinedMode = false;
-    combinedKeys = { customerKey: null, supplierKey: null };
+    combinedKeys = { customerKeys: [], supplierKeys: [] }; tagState.customer = []; tagState.supplier = [];
     document.getElementById('modeSelect').value = 'customer';
     document.getElementById('partyLabel').style.display = '';
     document.getElementById('partySelect').style.display = '';
@@ -3487,14 +3676,14 @@ document.getElementById('backToDashboard').addEventListener('click', () => {
 
 document.getElementById('fetchBtn').addEventListener('click', async () => {
   if (isCombinedMode) {
-    const customerKey = document.getElementById('combinedCustomerSelect').value;
-    const supplierKey = document.getElementById('combinedSupplierSelect').value;
-    if (!customerKey || !supplierKey) {
-      showError('Please select both a customer and a supplier.');
+    const customerKeys = tagState.customer.map(p => p.key);
+    const supplierKeys = tagState.supplier.map(p => p.key);
+    if (customerKeys.length === 0 && supplierKeys.length === 0) {
+      showError('Please select at least one customer or supplier.');
       return;
     }
-    combinedKeys = { customerKey, supplierKey };
-    await generateCombinedStatement(customerKey, supplierKey);
+    combinedKeys = { customerKeys, supplierKeys };
+    await generateCombinedStatement(customerKeys, supplierKeys);
     return;
   }
   const selected = document.getElementById('partySelect').value;
@@ -3543,7 +3732,8 @@ document.getElementById('exportBtn').addEventListener('click', () => {
     showError('No data to export. Generate a statement first.');
     return;
   }
-  const cur = isCombinedMode ? currencyFor(combinedKeys.customerKey) : currencyFor(activePartyKey);
+  const combinedFirstKey = isCombinedMode ? (combinedKeys.customerKeys[0] || combinedKeys.supplierKeys[0] || null) : null;
+  const cur = combinedFirstKey ? currencyFor(combinedFirstKey) : currencyFor(activePartyKey);
   exportCSV(currentDisplayRows, currentRange.from, currentRange.to, cur);
 });
 
